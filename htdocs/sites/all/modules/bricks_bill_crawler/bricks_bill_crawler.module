@@ -1,0 +1,102 @@
+<?php
+
+/* 
+ * Implements hook_menu().
+ */
+function bricks_bill_crawler_menu() {
+//  $items['admin/bill_crawler'] = array(
+//    'title' => 'Bricks bill crawler',
+//    'page callback' => 'drupal_get_form',
+//    'page arguments' => array('bricks_bill_crawler_xml_upload_form'),
+//    'access arguments' => array('access content overview'),
+//  );
+  $items['admin/bill_crawler'] = array(
+    'title' => 'Bricks bill crawler',
+    'page callback' => 'bricks_bill_crawler_start_crawler',
+    'access arguments' => array('access content overview'),
+  );
+  
+  
+  return $items;
+}
+
+function bricks_bill_crawler_xml_upload_form($form, &$form_state) {
+	
+}
+
+/*
+ * get one order from website
+ */
+function bricks_bill_crawler_get_order($login_session, $order_id) {
+  $order_url = 'http://www.bricklink.com/orderDetail.asp?ID=' . $order_id;
+  curl_setopt($login_session, CURLOPT_URL, $order_url);
+  $order_data = curl_exec($login_session);
+  
+  return $order_data;
+}
+
+/*
+ * save order
+ */ 
+function bricks_bill_crawler_login_save_buyer($order) {
+  $buyer = array();
+  $start_pos_buyer_block = stripos($order, '<b>Buyer Information</b>');
+  $end_pos_buyer_block = stripos($order, '<b>Seller Information</b>');
+  $buyer_block = substr($order, $start_pos_buyer_block, ($end_pos_buyer_block-$start_pos_buyer_block));
+  preg_match('/HREF="mailto:(.*)">/isU', $buyer_block, $email_match);
+  $buyer['emai'] = $email_match[1];
+  preg_match('/Name & Address:<\/TD><TD WIDTH="75%">(.*)<\/TD>/isU', $buyer_block, $address_match);
+  $buyer['address'] = $address_match[1];
+  $country_pos = strripos($buyer['address'], '<BR>');  
+  $buyer['country'] = substr($buyer['address'], ($country_pos + 4));
+  preg_match('/<td>Grand Total:(.*)/isU', $order, $total_grand);
+  var_dump($total_grand);
+}
+ 
+/*
+ * start crawler
+ */
+function bricks_bill_crawler_start_crawler() {var_dump('start');
+  $login_session = bricks_bill_crawler_login_bricklink();
+  $order = bricks_bill_crawler_get_order($login_session, 3689147);
+  bricks_bill_crawler_login_save_buyer($order);
+  
+  curl_close($login_session);
+}
+
+/*
+ * login to bricklink
+ */
+function bricks_bill_crawler_login_bricklink() {
+  
+  $login_url = 'https://www.bricklink.com/login.asp?logInTo=&logFolder=p&logSub=w'; 
+  
+  $post_fields = array(
+    'logFrmFlag' => 'Y',
+		'a' => 'a',
+		'frmUsername' => urlencode('44bricks'),
+		'frmPassword' => urlencode('16022011DD'),
+		'submit' => 'Login to BrickLink'
+	);
+  
+	$post_fields_string = '';
+	foreach($post_fields as $key=>$value) { 
+		$post_fields_string .= $key.'='.$value.'&'; 
+	}
+
+  $curl = curl_init();  
+  curl_setopt($curl, CURLOPT_HTTPAUTH, CURLAUTH_BASIC ) ; 
+  curl_setopt($curl, CURLOPT_USERPWD, "44bricks:16022011DD"); 
+  curl_setopt($curl, CURLOPT_SSLVERSION,3); 
+  curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, FALSE); 
+  curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, 2); 
+  curl_setopt($curl, CURLOPT_HEADER, true); 
+  curl_setopt($curl, CURLOPT_POST, true); 
+  curl_setopt($curl, CURLOPT_POSTFIELDS, $post_fields_string ); 
+  curl_setopt($curl, CURLOPT_RETURNTRANSFER, true); 
+  curl_setopt($curl, CURLOPT_USERAGENT, "Mozilla/4.0 (compatible; MSIE 5.01; Windows NT 5.0)"); 
+  curl_setopt($curl, CURLOPT_URL, $login_url);
+  curl_exec($curl);
+  
+  return  $curl;
+} 
