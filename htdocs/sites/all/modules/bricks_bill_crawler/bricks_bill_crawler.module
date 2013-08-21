@@ -20,10 +20,6 @@ function bricks_bill_crawler_menu() {
   return $items;
 }
 
-function bricks_bill_crawler_xml_upload_form($form, &$form_state) {
-	
-}
-
 /*
  * get one order from website
  */
@@ -38,30 +34,67 @@ function bricks_bill_crawler_get_order($login_session, $order_id) {
 /*
  * save order
  */ 
-function bricks_bill_crawler_login_save_buyer($order) {
+function bricks_bill_crawler_order_crawl($order) {
   $buyer = array();
   $start_pos_buyer_block = stripos($order, '<b>Buyer Information</b>');
   $end_pos_buyer_block = stripos($order, '<b>Seller Information</b>');
   $buyer_block = substr($order, $start_pos_buyer_block, ($end_pos_buyer_block-$start_pos_buyer_block));
   preg_match('/HREF="mailto:(.*)">/isU', $buyer_block, $email_match);
-  $buyer['emai'] = $email_match[1];
+  $buyer['email'] = $email_match[1];
   preg_match('/Name & Address:<\/TD><TD WIDTH="75%">(.*)<\/TD>/isU', $buyer_block, $address_match);
   $buyer['address'] = $address_match[1];
   $country_pos = strripos($buyer['address'], '<BR>');  
   $buyer['country'] = substr($buyer['address'], ($country_pos + 4));
-  preg_match('/<td>Grand Total:(.*)/isU', $order, $total_grand);
-  var_dump($total_grand);
+  //preg_match('/<td>Grand Total:(.*)/isU', $order, $total_grand);
+  if (!empty($buyer['email']) && !empty($buyer['address']) && !empty($buyer['country'])) {
+    return $buyer;
+  }
+  else {    
+    return false;
+  }  
 }
  
 /*
  * start crawler
  */
-function bricks_bill_crawler_start_crawler() {var_dump('start');
+function bricks_bill_crawler_start_crawler() {
+  // login
   $login_session = bricks_bill_crawler_login_bricklink();
-  $order = bricks_bill_crawler_get_order($login_session, 3689147);
-  bricks_bill_crawler_login_save_buyer($order);
   
+  if ($login_session != false) {
+    // load open order nodes
+    $order_nodes = bricks_bill_crawler_load_order_nodes();
+    foreach ($order_nodes as $order_node) {
+      // node load
+      $order_node = node_load($order_node->nid);
+      // read order page
+      $order = bricks_bill_crawler_get_order($login_session, $order_node->title);
+      // crawl order
+      $crawl_order = bricks_bill_crawler_order_crawl($order);
+      if ($crawl_order == false) {
+        watchdog('Bricks bill crawler', 'Crawler with no result by NID: %nid', array('%nid' => $order_node->nid), WATCHDOG_ERROR);
+      }
+      else {
+        // save crawler values
+        $order_node->field_order_email[$order_node->language][0]['value'] = $crawl_order['email'];
+        $order_node->field_order_address[$order_node->language][0]['value'] = $crawl_order['address'];
+        $order_node->field_order_country[$order_node->language][0]['value'] = $crawl_order['country'];
+        $order_node->field_order_crawled[$order_node->language][0]['value'] = 1;
+        node_save($order_node);
+      }
+    }
+  }
+  else {
+    watchdog('Bricks bill crawler', 'Login not available', '', WATCHDOG_ERROR);
+  }  
   curl_close($login_session);
+}
+
+/**
+ * Implements hook_cron().
+ */
+function bricks_bill_crawler_cron() {
+  bricks_bill_crawler_start_crawler();
 }
 
 /*
@@ -98,5 +131,34 @@ function bricks_bill_crawler_login_bricklink() {
   curl_setopt($curl, CURLOPT_URL, $login_url);
   curl_exec($curl);
   
-  return  $curl;
+  // test login
+  curl_setopt($curl, CURLOPT_URL, 'http://www.bricklink.com/my.asp');
+  $order_data = curl_exec($curl);
+  if (strpos($order_data, 'Object Moved')) {
+    return false;
+  }
+  else {
+    return $curl;
+  }
+}
+
+/*
+ * load order nodes to crawl
+ */
+function bricks_bill_crawler_load_order_nodes($limit = 10) {
+  $order_nodes = array();
+  $query = new EntityFieldQuery;
+
+  $query->entityCondition('entity_type', 'node')
+        ->propertyCondition('type', 'orders')
+        ->fieldCondition('field_order_crawled', 'value', 0, '=')
+        ->range(0, $limit);
+    
+  foreach ($query->execute() as $entity_type => $entities) {
+      foreach ($entities as $entity_id => $entity) {
+        $order_nodes[] =  $entity;
+      }
+  }
+    
+  return $order_nodes;
 } 
