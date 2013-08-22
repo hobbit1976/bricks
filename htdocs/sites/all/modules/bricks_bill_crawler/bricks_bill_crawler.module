@@ -12,7 +12,7 @@ function bricks_bill_crawler_menu() {
 //  );
   $items['admin/bill_crawler'] = array(
     'title' => 'Bricks bill crawler',
-    'page callback' => 'bricks_bill_crawler_start_crawler',
+    'page callback' => 'bricks_bill_crawler_start_crawler_test',
     'access arguments' => array('access content overview'),
   );
   
@@ -28,13 +28,35 @@ function bricks_bill_crawler_get_order($login_session, $order_id) {
   curl_setopt($login_session, CURLOPT_URL, $order_url);
   $order_data = curl_exec($login_session);
   
-  return $order_data;
+  if (strpos($order_data, 'Object Moved')) {
+    return false;
+  }
+  else {
+    return $order_data;
+  }
 }
 
 /*
- * save order
+ * get one item from website
+ */
+function bricks_bill_crawler_get_item($login_session, $item_id) {
+  $item_url = 'http://www.bricklink.com/catalogItem.asp?S=' . $item_id;
+  curl_setopt($login_session, CURLOPT_URL, $item_url);
+  $item_data = curl_exec($login_session);
+  
+  if (strpos($item_data, 'No Item(s) were found. Please try again!')) {
+    return false;
+  }
+  else {
+    return $item_data;
+  }
+}
+
+/*
+ * crawl order
  */ 
 function bricks_bill_crawler_order_crawl($order) {
+  include_once('simple_html_dom.php');
   $buyer = array();
   $start_pos_buyer_block = stripos($order, '<b>Buyer Information</b>');
   $end_pos_buyer_block = stripos($order, '<b>Seller Information</b>');
@@ -46,6 +68,8 @@ function bricks_bill_crawler_order_crawl($order) {
   $country_pos = strripos($buyer['address'], '<BR>');  
   $buyer['country'] = substr($buyer['address'], ($country_pos + 4));
   //preg_match('/<td>Grand Total:(.*)/isU', $order, $total_grand);
+  
+  
   if (!empty($buyer['email']) && !empty($buyer['address']) && !empty($buyer['country'])) {
     return $buyer;
   }
@@ -53,7 +77,33 @@ function bricks_bill_crawler_order_crawl($order) {
     return false;
   }  
 }
- 
+/*
+ * crawl item
+ */ 
+function bricks_bill_crawler_item_crawl($item) {
+  include_once('simple_html_dom.php');
+  $label = '';
+  $html = str_get_html($item);
+  foreach($html->find('table center font[face="Geneva,Arial,Helvetica"] b') as $element) {
+       $label = $element;
+  }
+  if ($label != '') {
+    return $label;
+  }
+  else {    
+    return false;
+  }  
+}
+
+/*
+ * start crawler test
+ */
+function bricks_bill_crawler_start_crawler_test() {
+  $login_session = bricks_bill_crawler_login_bricklink();
+  $item = bricks_bill_crawler_get_item($login_session, '8455-1');
+  $crawl_order = bricks_bill_crawler_item_crawl($item);
+} 
+
 /*
  * start crawler
  */
@@ -69,19 +119,41 @@ function bricks_bill_crawler_start_crawler() {
       $order_node = node_load($order_node->nid);
       // read order page
       $order = bricks_bill_crawler_get_order($login_session, $order_node->title);
+      if ($order == false) {
+        watchdog('Bricks bill crawler', 'No Order data by NID: %nid', array('%nid' => $order_node->nid), WATCHDOG_ERROR);
+        continue;
+      }
       // crawl order
       $crawl_order = bricks_bill_crawler_order_crawl($order);
       if ($crawl_order == false) {
         watchdog('Bricks bill crawler', 'Crawler with no result by NID: %nid', array('%nid' => $order_node->nid), WATCHDOG_ERROR);
+        continue;
       }
-      else {
-        // save crawler values
-        $order_node->field_order_email[$order_node->language][0]['value'] = $crawl_order['email'];
-        $order_node->field_order_address[$order_node->language][0]['value'] = $crawl_order['address'];
-        $order_node->field_order_country[$order_node->language][0]['value'] = $crawl_order['country'];
-        $order_node->field_order_crawled[$order_node->language][0]['value'] = 1;
-        node_save($order_node);
+      // crawl item label    
+      foreach ($order_node->field_orderitemid[$order_node->language] as $key => $value) {
+        if ($order_node->field_orderitemprice[$order_node->language][$key]["value"] > 50 && $order_node->field_orderitemtype[$order_node->language][$key]["value"] == 'S') {
+          // read item page
+          $item = bricks_bill_crawler_get_item($login_session, $order_node->field_itemid[$order_node->language][$key]["value"]);
+          if ($item == false) {
+            watchdog('Bricks bill crawler', 'No Item data by NID: %nid', array('%nid' => $order_node->nid), WATCHDOG_ERROR);
+            continue;
+          }
+          // crawl item
+          $label = bricks_bill_crawler_item_crawl($item);
+          if ($label == false) {
+            watchdog('Bricks bill crawler', 'No Item label by NID: %nid', array('%nid' => $order_node->nid), WATCHDOG_ERROR);
+            continue;
+          }
+          $order_node->field_orderitemlabel[$order_node->language][$key]["value"] = $label;
+        }
       }
+      // save crawler values
+      $order_node->field_order_email[$order_node->language][0]['email'] = $crawl_order['email'];
+      $order_node->field_order_address[$order_node->language][0]['value'] = $crawl_order['address'];
+      $order_node->field_order_country[$order_node->language][0]['value'] = $crawl_order['country'];
+      $order_node->field_order_crawled[$order_node->language][0]['value'] = 1;
+      node_save($order_node);
+      
     }
   }
   else {
@@ -161,4 +233,8 @@ function bricks_bill_crawler_load_order_nodes($limit = 10) {
   }
     
   return $order_nodes;
-} 
+}
+
+function br2nl($string) {
+  return preg_replace('/\<br(\s*)?\/?\>/i', "\n", $string);
+}            

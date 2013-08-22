@@ -112,6 +112,7 @@ function bartik_preprocess_node(&$variables) {
   if ($variables['view_mode'] == 'full' && node_is_page($variables['node'])) {
     $variables['classes_array'][] = 'node-full';
   }
+  $variables['template_files'][] = 'node--'. str_replace('_', '-', $variables['node']->type);
 }
 
 /**
@@ -153,4 +154,11 @@ function bartik_field__taxonomy_term_reference($variables) {
   $output = '<div class="' . $variables['classes'] . (!in_array('clearfix', $variables['classes_array']) ? ' clearfix' : '') . '"' . $variables['attributes'] .'>' . $output . '</div>';
 
   return $output;
+}
+
+function bartik_preprocess_page(&$vars, $hook) {
+  if (isset($vars['node'])) {
+    // If the node type is "blog" the template suggestion will be "page--blog.tpl.php".
+    $vars['theme_hook_suggestions'][] = 'page__'. str_replace('_', '--', $vars['node']->type);
+  }
 }
