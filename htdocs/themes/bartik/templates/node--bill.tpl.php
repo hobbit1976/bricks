@@ -77,48 +77,109 @@
  * @see template_preprocess_node()
  * @see template_process()
  */
+ $raw_pos =
+    '<div style="border-bottom: 0.1mm solid grey;display: table-row; position: relative; width: 100%;">
+      <div style="width: 1.0cm; display: table-cell; padding-left: 2mm; padding-right: 2mm">
+        Pos.
+      </div>
+      <div style="width: 1.5cm; display: table-cell; padding-left: 2mm; padding-right: 2mm; border-left: 0.1mm solid grey">
+        Art.Nr.
+      </div>
+      <div style="width: 5.0cm; display: table-cell; padding-left: 2mm; padding-right: 2mm; border-left: 0.1mm solid grey">
+        Beschreibung
+      </div>
+      <div style="width: 1.5cm; display: table-cell; padding-left: 2mm; padding-right: 2mm; border-left: 0.1mm solid grey; text-align: right">
+        Menge
+      </div>
+      <div style="width: 2.25cm; display: table-cell; padding-left: 2mm; padding-right: 2mm; border-left: 0.1mm solid grey; text-align: right">
+        Einzelpreis netto
+      </div>
+      <div style="width: 2.25cm; display: table-cell; padding-left: 2mm; padding-right: 2mm; border-left: 0.1mm solid grey; text-align: right">
+        Gesamtpreis netto
+      </div>
+    </div>'    
+ ;
+ 
 ?>
-<div id="node-<?php print $node->nid; ?>" class="<?php print $classes; ?> clearfix"<?php print $attributes; ?>>
-TEST
-  <?php print render($title_prefix); ?>
-  <?php if (!$page): ?>
-    <h2<?php print $title_attributes; ?>>
-      <a href="<?php print $node_url; ?>"><?php print $title; ?></a>
-    </h2>
-  <?php endif; ?>
-  <?php print render($title_suffix); ?>
-
-  <?php if ($display_submitted): ?>
-    <div class="meta submitted">
-      <?php print $user_picture; ?>
-      <?php print $submitted; ?>
-    </div>
-  <?php endif; ?>
-
-  <div class="content clearfix"<?php print $content_attributes; ?>>
-    <?php
-      // We hide the comments and links now so that we can render them later.
-      hide($content['comments']);
-      hide($content['links']);
-      print render($content['field_bill_address']);
-    ?>
+<div style="margin: 0.0cm; border: 0.1mm solid grey; position: relative; min-height: 27cm; font-size: 9px; width: 100%">
+  
+  <div style="margin-right: 0; position: relative; height: 3.1cm; border-bottom: 0.1mm solid grey">
+    <img style="height: 3.0cm; position: absolute; right: 2.0mm" src="<?php print '/' . drupal_get_path('theme', 'bartik') . '/templates/bricks-logo.jpg'; ?>" />
   </div>
-
-  <?php
-    // Remove the "Add new comment" link on the teaser page or if the comment
-    // form is being displayed on the same page.
-    if ($teaser || !empty($content['comments']['comment_form'])) {
-      unset($content['links']['comment']['#links']['comment-add']);
-    }
-    // Only display the wrapper div if there are links.
-    $links = render($content['links']);
-    if ($links):
-  ?>
-    <div class="link-wrapper">
-      <?php print $links; ?>
+  
+  <div style="border-bottom: 0.1mm solid grey; position: relative; display: table; width: 100%">
+    <div style="display: table-row; position: relative">
+      <div style="width: 11.4cm; display: table-cell; padding-left: 2mm">
+        Text1
+      </div>
+      <div style="position: relative; border-left: 0.1mm solid grey; display: table-cell; width: auto; padding-left: 2mm">
+        Text2
+      </div>
+    </div>    
+  </div>
+  
+  <div style="font-size: 14px; text-align: center; position: relative; border-bottom: 0.1mm solid grey">
+    Rechnung
+  </div>
+  
+  <div style="border-bottom: 0.1mm solid grey; position: relative; display: table; width: 100%">
+    <div style="display: table-row; position: relative">
+      <div style="width: 11.4cm; display: table-cell; padding-left: 2mm">
+        Text1
+      </div>
+      <div style="position: relative; border-left: 0.1mm solid grey; display: table-cell; width: auto; padding-left: 2mm">
+        Text2
+      </div>
+    </div>    
+  </div>
+  
+  <div style="position: relative">
+    Text1
+  </div>
+  
+  
+  
+  <div style="position: relative; display: table; font-size: 8px; border-collapse: collapse; margin-left: auto; margin-right: auto; border-left: 0.1mm solid grey; border-right: 0.1mm solid grey">
+    <div style="border-bottom: 0.1mm solid grey; border-top: 0.1mm solid grey; display: table-row; position: relative; width: 100%; font-weight: bold">
+      <div style="width: 1.0cm; display: table-cell; padding-left: 2mm; padding-right: 2mm">
+        Pos.
+      </div>
+      <div style="width: 1.5cm; display: table-cell; padding-left: 2mm; padding-right: 2mm; border-left: 0.1mm solid grey">
+        Art.Nr.
+      </div>
+      <div style="width: 5.0cm; display: table-cell; padding-left: 2mm; padding-right: 2mm; border-left: 0.1mm solid grey">
+        Beschreibung
+      </div>
+      <div style="width: 1.5cm; display: table-cell; padding-left: 2mm; padding-right: 2mm; border-left: 0.1mm solid grey; text-align: right">
+        Menge
+      </div>
+      <div style="width: 2.25cm; display: table-cell; padding-left: 2mm; padding-right: 2mm; border-left: 0.1mm solid grey; text-align: right">
+        Einzelpreis netto
+      </div>
+      <div style="width: 2.25cm; display: table-cell; padding-left: 2mm; padding-right: 2mm; border-left: 0.1mm solid grey; text-align: right">
+        Gesamtpreis netto
+      </div>
     </div>
-  <?php endif; ?>
-
-  <?php print render($content['comments']); ?>
-
+    
+    <?php print $raw_pos; ?>
+        
+  </div>
+  
+  <div style="position: relative; padding-left: 2mm; padding-right: 2mm">
+    Text
+  </div>
+  
+  <div style="display: table; position: absolute; bottom: 0px; border-top: 0.1mm solid grey; width: 100%;">
+    <div style="display: table-row; height: 2.5cm; color: #666666">
+      <div style="display: table-cell; width: 5.0cm; padding-left: 2mm; padding-right: 2mm;">
+        Text
+      </div>
+      <div style="display: table-cell; width: 5.25cm; border-left: 0.1mm solid grey; padding-left: 2mm; padding-right: 2mm;">
+        Text
+      </div>
+      <div style="display: table-cell; border-left: 0.1mm solid grey; padding-left: 2mm; padding-right: 2mm;">
+        Text
+      </div>
+    </div>
+  </div>
 </div>
