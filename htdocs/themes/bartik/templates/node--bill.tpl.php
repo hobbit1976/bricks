@@ -1,83 +1,61 @@
 <?php
 
-/**
- * @file
- * Bartik's theme implementation to display a node.
- *
- * Available variables:
- * - $title: the (sanitized) title of the node.
- * - $content: An array of node items. Use render($content) to print them all,
- *   or print a subset such as render($content['field_example']). Use
- *   hide($content['field_example']) to temporarily suppress the printing of a
- *   given element.
- * - $user_picture: The node author's picture from user-picture.tpl.php.
- * - $date: Formatted creation date. Preprocess functions can reformat it by
- *   calling format_date() with the desired parameters on the $created variable.
- * - $name: Themed username of node author output from theme_username().
- * - $node_url: Direct URL of the current node.
- * - $display_submitted: Whether submission information should be displayed.
- * - $submitted: Submission information created from $name and $date during
- *   template_preprocess_node().
- * - $classes: String of classes that can be used to style contextually through
- *   CSS. It can be manipulated through the variable $classes_array from
- *   preprocess functions. The default values can be one or more of the
- *   following:
- *   - node: The current template type; for example, "theming hook".
- *   - node-[type]: The current node type. For example, if the node is a
- *     "Blog entry" it would result in "node-blog". Note that the machine
- *     name will often be in a short form of the human readable label.
- *   - node-teaser: Nodes in teaser form.
- *   - node-preview: Nodes in preview mode.
- *   The following are controlled through the node publishing options.
- *   - node-promoted: Nodes promoted to the front page.
- *   - node-sticky: Nodes ordered above other non-sticky nodes in teaser
- *     listings.
- *   - node-unpublished: Unpublished nodes visible only to administrators.
- * - $title_prefix (array): An array containing additional output populated by
- *   modules, intended to be displayed in front of the main title tag that
- *   appears in the template.
- * - $title_suffix (array): An array containing additional output populated by
- *   modules, intended to be displayed after the main title tag that appears in
- *   the template.
- *
- * Other variables:
- * - $node: Full node object. Contains data that may not be safe.
- * - $type: Node type; for example, story, page, blog, etc.
- * - $comment_count: Number of comments attached to the node.
- * - $uid: User ID of the node author.
- * - $created: Time the node was published formatted in Unix timestamp.
- * - $classes_array: Array of html class attribute values. It is flattened
- *   into a string within the variable $classes.
- * - $zebra: Outputs either "even" or "odd". Useful for zebra striping in
- *   teaser listings.
- * - $id: Position of the node. Increments each time it's output.
- *
- * Node status variables:
- * - $view_mode: View mode; for example, "full", "teaser".
- * - $teaser: Flag for the teaser state (shortcut for $view_mode == 'teaser').
- * - $page: Flag for the full page state.
- * - $promote: Flag for front page promotion state.
- * - $sticky: Flags for sticky post setting.
- * - $status: Flag for published status.
- * - $comment: State of comment settings for the node.
- * - $readmore: Flags true if the teaser content of the node cannot hold the
- *   main body content.
- * - $is_front: Flags true when presented in the front page.
- * - $logged_in: Flags true when the current user is a logged-in member.
- * - $is_admin: Flags true when the current user is an administrator.
- *
- * Field variables: for each field instance attached to the node a corresponding
- * variable is defined; for example, $node->body becomes $body. When needing to
- * access a field's raw values, developers/themers are strongly encouraged to
- * use these variables. Otherwise they will have to explicitly specify the
- * desired field language; for example, $node->body['en'], thus overriding any
- * language negotiation rule that was previously applied.
- *
- * @see template_preprocess()
- * @see template_preprocess_node()
- * @see template_process()
- */
- $raw_pos =
+  // Textbausteine
+  if (1 == 1) {
+    $bricks_address_small = '44 Bricks UG (haftungsbeschränkt) | Königstr. 17 | D-01097 Dresden | Deutschland';
+    $bricks_address_big =   '44 Bricks UG (haftungsbeschränkt) <br />
+                            Königstr. 17 <br />
+                            D-01097 Dresden <br />
+                            Deutschland <br />
+                            <br />
+                            Tel.: +49(0)351-21966427 <br />
+                            Fax: +49(0)351-8080698 <br />
+                            E-Mail: info@44bricks.com <br />
+                            Web: www.44bricks.com <br />
+                            <br />
+                            USt-IdNr.: DE276778872 <br />
+                            St.-Nr.: 202/106/08762 <br />
+                            <br />';
+    $bricks_bill_string = 'Rechnung';
+    $bricks_bill_number = '<div style="float: left">Rechnung Nr.&nbsp;</div>';
+    $bricks_bill_delivery_date = '<div style="float: left">Lieferdatum:&nbsp;</div>';
+    $bricks_bill_invoice_date = '<div style="float: left">Rechnungsdatum:&nbsp;</div>';
+    $bricks_bill_term_of_payment = '<div style="float: left">Zahlungsziel:&nbsp;</div>';
+    $bricks_bill_salutation = '<div style="float: left">Hallo&nbsp;</div>';
+    $bricks_bill_salutation_part_2 = '<div style="float: left">gemäß Deiner BrickLink-Bestellung&nbsp;</div>';
+    $bricks_bill_salutation_part_3 = '<div style="float: rigth">&nbsp;berechnen wir Dir folgenden Auftrag:</div>';
+    
+  }
+  else {
+    $bricks_address_small ='44 Bricks UG (haftungsbeschränkt) | Königstr. 17 | D-01097 Dresden | Germany';
+    $bricks_address_big =   '44 Bricks UG (haftungsbeschränkt) <br />
+                            Königstr. 17 <br />
+                            D-01097 Dresden <br />
+                            Germany <br />
+                            <br />
+                            Tel.: +49(0)351-21966427 <br />
+                            Fax: +49(0)351-8080698 <br />
+                            E-Mail: info@44bricks.com <br />
+                            Web: www.44bricks.com <br />
+                            <br />
+                            VAT-ID: DE276778872 <br />
+                            Tax-ID: 202/106/08762 <br />
+                            <br />';
+    $bricks_bill_string = 'Invoice';
+    $bricks_bill_number = '<div style="float: left">Invoice No.&nbsp;</div>';
+    $bricks_bill_delivery_date = '<div style="float: left">Delivery date:&nbsp;</div>';
+    $bricks_bill_invoice_date = '<div style="float: left">Invoice date:&nbsp;</div>';
+    $bricks_bill_term_of_payment = '<div style="float: left">Term of payment:&nbsp;</div>';
+    $bricks_bill_salutation = '<div style="float: left">Dear&nbsp;</div>';
+    $bricks_bill_salutation_part_2 = '<div style="float: left">according to your BrickLink-Order&nbsp;</div>';
+    $bricks_bill_salutation_part_3 = '<div style="float: rigth">&nbsp;we invoice you for the following goods:</div>';
+    
+    
+  }
+  foreach ($content['field_bill_items_item']['und'] as $key => $value) {
+    
+  }
+  $raw_pos =
     '<div style="border-bottom: 0.1mm solid grey;display: table-row; position: relative; width: 100%;">
       <div style="width: 1.0cm; display: table-cell; padding-left: 2mm; padding-right: 2mm">
         Pos.
@@ -110,31 +88,41 @@
   <div style="border-bottom: 0.1mm solid grey; position: relative; display: table; width: 100%">
     <div style="display: table-row; position: relative">
       <div style="width: 11.4cm; display: table-cell; padding-left: 2mm">
-        Text1
+        <div style="font-size: 6px"><?php print $bricks_address_small; ?></div>
+        <br />
+        <?php print render($content['field_bill_address']); ?>
       </div>
       <div style="position: relative; border-left: 0.1mm solid grey; display: table-cell; width: auto; padding-left: 2mm">
-        Text2
+        <?php print $bricks_address_big; ?>
       </div>
     </div>    
   </div>
   
-  <div style="font-size: 14px; text-align: center; position: relative; border-bottom: 0.1mm solid grey">
-    Rechnung
+  <div style="font-size: 14px; font-weight: bold; text-align: center; position: relative; border-bottom: 0.1mm solid grey">
+    <?php print $bricks_bill_string; ?>
   </div>
   
   <div style="border-bottom: 0.1mm solid grey; position: relative; display: table; width: 100%">
     <div style="display: table-row; position: relative">
       <div style="width: 11.4cm; display: table-cell; padding-left: 2mm">
-        Text1
+        <?php print $bricks_bill_number; ?><?php print render($content['field_bill_number']); ?>
+        <br />
+        <?php print $bricks_bill_delivery_date; ?><?php print render($content['field_bill_delivery_date']); ?>
+        <br />
       </div>
-      <div style="position: relative; border-left: 0.1mm solid grey; display: table-cell; width: auto; padding-left: 2mm">
-        Text2
+      <div style="position: relative; border-left: 0.1mm solid grey; display: table-cell; width: auto; padding-left: 2mm">        
+        <?php print $bricks_bill_invoice_date; ?><?php print render($content['field_bill_invoice_date']); ?>     
+        <?php print $bricks_bill_term_of_payment; ?><?php print render($content['field_bill_term_of_payment']); ?>
       </div>
     </div>    
   </div>
   
-  <div style="position: relative">
-    Text1
+  <div style="position: relative; padding-left: 2mm; padding-right: 2mm">
+    <?php print $bricks_bill_salutation; ?><div style="float: left"><?php print render($content['field_bill_salutation']); ?></div><div>,</div>
+    <br />
+    <?php print $bricks_bill_salutation_part_2; ?><div style="float: left"><?php print render($content['field_bill_order_id']); ?></div><?php print $bricks_bill_salutation_part_3; ?>
+    <br />
+    
   </div>
   
   

@@ -58,6 +58,10 @@ function bricks_bill_crawler_get_item($login_session, $item_id) {
 function bricks_bill_crawler_order_crawl($order) {
   include_once('simple_html_dom.php');
   $buyer = array();
+  $html = str_get_html($order);
+  foreach($html->find('table', 0)->find('font', 1)->find('table', 0)->find('tr', 0)->find('table', 1)->find('tr', 6)->find('b') as $element) {
+   $buyer['pay_grand'] = strip_tags((string) $element);
+  }
   $start_pos_buyer_block = stripos($order, '<b>Buyer Information</b>');
   $end_pos_buyer_block = stripos($order, '<b>Seller Information</b>');
   $buyer_block = substr($order, $start_pos_buyer_block, ($end_pos_buyer_block-$start_pos_buyer_block));
@@ -85,7 +89,7 @@ function bricks_bill_crawler_item_crawl($item) {
   $label = '';
   $html = str_get_html($item);
   foreach($html->find('table center font[face="Geneva,Arial,Helvetica"] b') as $element) {
-       $label = $element;
+    $label = $element;
   }
   if ($label != '') {
     return $label;
@@ -100,8 +104,8 @@ function bricks_bill_crawler_item_crawl($item) {
  */
 function bricks_bill_crawler_start_crawler_test() {
   $login_session = bricks_bill_crawler_login_bricklink();
-  $item = bricks_bill_crawler_get_item($login_session, '8455-1');
-  $crawl_order = bricks_bill_crawler_item_crawl($item);
+  $item = bricks_bill_crawler_get_order($login_session, '3654022');
+  $crawl_order = bricks_bill_crawler_order_crawl($item);var_dump($crawl_order);
 } 
 
 /*
@@ -151,6 +155,7 @@ function bricks_bill_crawler_start_crawler() {
       $order_node->field_order_email[$order_node->language][0]['email'] = $crawl_order['email'];
       $order_node->field_order_address[$order_node->language][0]['value'] = $crawl_order['address'];
       $order_node->field_order_country[$order_node->language][0]['value'] = $crawl_order['country'];
+      $order_node->field_order_pay_grand_total[$order_node->language][0]['value'] = $crawl_order['pay_grand'];
       $order_node->field_order_crawled[$order_node->language][0]['value'] = 1;
       node_save($order_node);
       
