@@ -1,7 +1,7 @@
 <?php
 
   // Textbausteine
-  if (1 == 1) {
+  if ($content['field_bill_language']['#items'][0]['value'] == 'de') {
     $bricks_address_small = '44 Bricks UG (haftungsbeschränkt) | Königstr. 17 | D-01097 Dresden | Deutschland';
     $bricks_address_big =   '44 Bricks UG (haftungsbeschränkt) <br />
                             Königstr. 17 <br />
@@ -24,6 +24,8 @@
     $bricks_bill_salutation = '<div style="float: left">Hallo&nbsp;</div>';
     $bricks_bill_salutation_part_2 = '<div style="float: left">gemäß Deiner BrickLink-Bestellung&nbsp;</div>';
     $bricks_bill_salutation_part_3 = '<div style="float: rigth">&nbsp;berechnen wir Dir folgenden Auftrag:</div>';
+    $bricks_bill_shipping_parts_1 = 'V';
+    $bricks_bill_shipping_parts_2 = 'Verpackung & Versand';
     
   }
   else {
@@ -49,36 +51,40 @@
     $bricks_bill_salutation = '<div style="float: left">Dear&nbsp;</div>';
     $bricks_bill_salutation_part_2 = '<div style="float: left">according to your BrickLink-Order&nbsp;</div>';
     $bricks_bill_salutation_part_3 = '<div style="float: rigth">&nbsp;we invoice you for the following goods:</div>';
+    $bricks_bill_shipping_parts_1 = 'S';
+    $bricks_bill_shipping_parts_2 = 'Shipping & Packaging';
     
     
   }
-  foreach ($content['field_bill_items_item']['und'] as $key => $value) {
-    
+  $raw_items = '';
+  $items_count = 0;
+  foreach ($content['field_bill_items_item']['#items'] as $key => $value) {
+    $items_count++;
+    $raw_items .=
+      '<div class="bill-items" style="border-bottom: 0.1mm solid grey; border-top: 0.1mm solid grey; display: table-row; position: relative; width: 100%; font-weight: bold">
+        <div style="width: 1.0cm; display: table-cell; padding-left: 2mm; padding-right: 2mm">
+          ' . $content['field_bill_items_item']['#items'][$key]["value"] . '
+        </div>
+        <div style="width: 1.5cm; display: table-cell; border-left: 0.1mm solid grey; padding-left: 2mm; padding-right: 2mm">
+          ' . $content['field_bill_items_number']['#items'][$key]["value"] . '
+        </div>
+        <div style="width: 5.0cm; display: table-cell; border-left: 0.1mm solid grey; padding-left: 2mm; padding-right: 2mm">
+          ' . $content['field_bill_items_description']['#items'][$key]["value"] . '
+        </div>
+        <div style="width: 1.5cm; display: table-cell; border-left: 0.1mm solid grey; text-align: right; padding-left: 2mm; padding-right: 2mm">
+          ' . $content['field_bill_items_quantity']['#items'][$key]["value"] . '
+        </div>
+        <div style="width: 2.25cm; display: table-cell; border-left: 0.1mm solid grey; text-align: right; padding-left: 2mm; padding-right: 2mm">
+          ' . $content['field_bill_items_unit_price']['#items'][$key]["value"] . ' €
+        </div>
+        <div style="width: 2.25cm; display: table-cell; border-left: 0.1mm solid grey; text-align: right; padding-left: 2mm; padding-right: 2mm">
+          ' . $content['field_bill_items_total_price']['#items'][$key]["value"] . ' €
+        </div>
+      </div>'    
+    ;
   }
-  $raw_pos =
-    '<div style="border-bottom: 0.1mm solid grey;display: table-row; position: relative; width: 100%;">
-      <div style="width: 1.0cm; display: table-cell; padding-left: 2mm; padding-right: 2mm">
-        Pos.
-      </div>
-      <div style="width: 1.5cm; display: table-cell; padding-left: 2mm; padding-right: 2mm; border-left: 0.1mm solid grey">
-        Art.Nr.
-      </div>
-      <div style="width: 5.0cm; display: table-cell; padding-left: 2mm; padding-right: 2mm; border-left: 0.1mm solid grey">
-        Beschreibung
-      </div>
-      <div style="width: 1.5cm; display: table-cell; padding-left: 2mm; padding-right: 2mm; border-left: 0.1mm solid grey; text-align: right">
-        Menge
-      </div>
-      <div style="width: 2.25cm; display: table-cell; padding-left: 2mm; padding-right: 2mm; border-left: 0.1mm solid grey; text-align: right">
-        Einzelpreis netto
-      </div>
-      <div style="width: 2.25cm; display: table-cell; padding-left: 2mm; padding-right: 2mm; border-left: 0.1mm solid grey; text-align: right">
-        Gesamtpreis netto
-      </div>
-    </div>'    
- ;
- 
 ?>
+
 <div style="margin: 0.0cm; border: 0.1mm solid grey; position: relative; min-height: 27cm; font-size: 9px; width: 100%">
   
   <div style="margin-right: 0; position: relative; height: 3.1cm; border-bottom: 0.1mm solid grey">
@@ -149,7 +155,29 @@
       </div>
     </div>
     
-    <?php print $raw_pos; ?>
+    <?php print $raw_items; ?>
+    
+    <div class="bill-items" style="border-bottom: 0.1mm solid grey; border-top: 0.1mm solid grey; display: table-row; position: relative; width: 100%; font-weight: bold">
+      <div style="width: 1.0cm; display: table-cell; padding-left: 2mm; padding-right: 2mm">
+        <?php print $items_count+1; ?>
+      </div>
+      <div style="width: 1.5cm; display: table-cell; border-left: 0.1mm solid grey; padding-left: 2mm; padding-right: 2mm">
+        <?php print $bricks_bill_shipping_parts_1; ?>
+      </div>
+      <div style="width: 5.0cm; display: table-cell; border-left: 0.1mm solid grey; padding-left: 2mm; padding-right: 2mm">
+        <?php print $bricks_bill_shipping_parts_2; ?>
+      </div>
+      <div style="width: 1.5cm; display: table-cell; border-left: 0.1mm solid grey; text-align: right; padding-left: 2mm; padding-right: 2mm">
+        1
+      </div>
+      <div style="width: 2.25cm; display: table-cell; border-left: 0.1mm solid grey; text-align: right; padding-left: 2mm; padding-right: 2mm">
+        <?php print $content['field_shipping_packaging']['#items'][0]["value"]; ?> €
+      </div>
+      <div style="width: 2.25cm; display: table-cell; border-left: 0.1mm solid grey; text-align: right; padding-left: 2mm; padding-right: 2mm">
+        <?php print $content['field_shipping_packaging']['#items'][0]["value"]; ?> €
+      </div>
+    </div>
+    
         
   </div>
   

@@ -143,6 +143,7 @@ function bartik_field__taxonomy_term_reference($variables) {
     $output .= '<h3 class="field-label">' . $variables['label'] . ': </h3>';
   }
 
+  // Treat all user pages as administrative.
   // Render the items.
   $output .= ($variables['element']['#label_display'] == 'inline') ? '<ul class="links inline">' : '<ul class="links">';
   foreach ($variables['items'] as $delta => $item) {
@@ -159,6 +160,6 @@ function bartik_field__taxonomy_term_reference($variables) {
 function bartik_preprocess_page(&$vars, $hook) {
   if (isset($vars['node'])) {
     // If the node type is "blog" the template suggestion will be "page--blog.tpl.php".
-    $vars['theme_hook_suggestions'][] = 'page__'. str_replace('_', '--', $vars['node']->type);
+    //$vars['theme_hook_suggestions'][] = 'page__'. str_replace('_', '--', $vars['node']->type);
   }
 }

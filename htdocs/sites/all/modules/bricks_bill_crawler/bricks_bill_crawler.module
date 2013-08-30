@@ -1,5 +1,145 @@
 <?php
 
+function bricks_bill_crawler_admin_paths_alter(&$paths) {
+  $paths['node/*/edit'] = TRUE;
+}
+
+/** 
+ * Implements hook_theme().
+ */ 
+function bricks_bill_crawler_theme($existing, $type, $theme, $path) {
+    
+  return array(
+    'bill_node_form' => array(
+      'render element' => 'form',
+      'template' => 'bill-node-form',
+      'path' => drupal_get_path('module', 'bricks_bill_crawler'),
+    ),
+  );
+}
+
+/** 
+ * Preprocessor for theme('bill_node_form').
+ */
+function template_preprocess_bill_node_form(&$variables) {
+  
+}
+
+/* 
+ * Implements hook_node_update().
+ */
+function bricks_bill_crawler_node_update($node) {
+  // wenn Order crawled, dann Rechnung erstellen
+  if ($node->type == 'orders' && $node->field_order_crawled[$node->language][0]["value"] == 1) {
+    // prüfen auf vorhandene Rechnung
+    $order_bill = bricks_bill_crawler_load_bill_nodes($node->title);
+    if (!empty($order_bill)) {
+      drupal_set_message('Rechnung vorhanden');      
+    }
+    else {
+      // Rechnungssprache festlegen
+      $language = 'en';
+      if ($node->field_order_country[$node->language][0]["value"] == 'Germany' || $node->field_order_country[$node->language][0]["value"] == 'Austria') {
+        $language = 'de';
+      }
+      // Objekt anlegen
+      $bill_node = new stdClass();
+      // Typ festlegen
+      $bill_node->type = 'bill';
+      // default Werte setzen
+      node_object_prepare($bill_node);
+      // UID auf Admin setzen
+      $bill_node->uid = 1;
+      // Sprache auf neutral setzen
+      $bill_node->language = LANGUAGE_NONE;
+      // OrderID als Titel setzen
+      $bill_node->title = $node->title;
+      // Rechnungssprache setzen
+      $bill_node->field_bill_language[$node->language][0]["value"] = $language;
+      // Rechnungsnummer setzen
+      $bill_node->field_bill_number[$node->language][0]["value"] = date('y') . '/BL' . $node->title;
+      // Rechnungsdatum setzen
+      $bill_node->field_bill_invoice_date[$node->language][0]["value"] = date('d.m.Y');
+      // Lieferdatum setzen
+      $bill_node->field_bill_delivery_date[$node->language][0]["value"] = date('d.m.Y');
+      // Zahlungsziel setzen
+      $bill_node->field_bill_term_of_payment[$node->language][0]["value"] = $language == 'de' ? 'sofort fällig' : 'immediately due and payable';
+      // Anrede setzen
+      $address_array = explode('<BR>', $node->field_order_address[$node->language][0]["value"]);
+      $bill_node->field_bill_salutation[$node->language][0]["value"] = $address_array[0];
+      // Adresse setzen
+      $bill_node->field_bill_address[$node->language][0]["value"] = $node->field_order_address[$node->language][0]["value"];
+      // Order Items setzen
+      // Startewerte for Art.Nr. 1 setzen
+      $bill_node->field_shipping_packaging[$node->language][0]["value"] = $node->field_ordershipping[$node->language][0]["value"] + $node->field_orderinsurance[$node->language][0]["value"] + $node->field_orderaddchrg1[$node->language][0]["value"];      
+      $bill_node->field_bill_items_item[$node->language][0]["value"] = 1;
+      $bill_node->field_bill_items_number[$node->language][0]["value"] = 1;
+      $bill_node->field_bill_items_description[$node->language][0]["value"] = $language == 'de' ? 'LEGO Einzelteile' : 'LEGO Parts';
+      $bill_node->field_bill_items_quantity[$node->language][0]["value"] = 1;
+      $bill_node->field_bill_items_unit_price[$node->language][0]["value"] = $node->field_basegrandtotal[$node->language][0]["value"] - $bill_node->field_shipping_packaging[$node->language][0]["value"];
+      $bill_node->field_bill_items_total_price[$node->language][0]["value"] = $bill_node->field_bill_items_unit_price[$node->language][0]["value"];
+      $minus_item_price = 0;
+      
+      foreach ($node->field_orderitemid[$node->language] as $key => $value) {
+        // extra Items
+        $number_extra_item = 1;
+        if ($node->field_orderitemtype[$node->language][$key]['value'] == 'S' && $node->field_orderitemprice[$node->language][$key]['value'] >= 50) {
+          $minus_item_price = $minus_item_price + $node->field_orderitemprice[$node->language][$key]['value'];
+          $number_extra_item++;
+          $bill_node->field_bill_items_item[$node->language][]["value"] = $number_extra_item;
+          $bill_node->field_bill_items_number[$node->language][]["value"] = $node->field_itemid[$node->language][$key]['value'];
+          $bill_node->field_bill_items_description[$node->language][]["value"] = 'LEGO ' . $node->field_itemid[$node->language][$key]['value'] . ' - ' . $node->field_orderitemlabel[$node->language][$key]['value'] . "<br />";
+          if ($node->field_itemid[$node->language][$key]['value'] == 'N') {
+            $bill_node->field_bill_items_description[$node->language][]["value"] .= $language == 'de' ? 'Neu' : 'New';
+          }
+          else {
+            $bill_node->field_bill_items_description[$node->language][]["value"] .= $language == 'de' ? 'Gebraucht' : 'Used';
+          }
+          $bill_node->field_bill_items_quantity[$node->language][0]["value"] = $node->field_orderitemqty[$node->language][$key]['value'];
+          $bill_node->field_bill_items_unit_price[$node->language][0]["value"] = $node->field_orderitemprice[$node->language][$key]['value'];
+          $bill_node->field_bill_items_total_price[$node->language][0]["value"] = $bill_node->field_bill_items_quantity[$node->language][0]["value"] * $bill_node->field_bill_items_unit_price[$node->language][0]["value"];
+          $minus_item_price = $bill_node->field_bill_items_total_price[$node->language][0]["value"] + $minus_item_price;
+        }
+      }
+
+      // Gesamtpreise anpassen
+      $bill_node->field_bill_items_unit_price[$node->language][0]["value"] = $bill_node->field_bill_items_unit_price[$node->language][0]["value"] - $minus_item_price;
+      $bill_node->field_bill_items_total_price[$node->language][0]["value"] = $bill_node->field_bill_items_unit_price[$node->language][0]["value"];
+      
+      $bill_node->field_sub_total[$node->language][0]["value"] = $minus_item_price + $bill_node->field_bill_items_unit_price[$node->language][0]["value"] + $bill_node->field_shipping_packaging[$node->language][0]["value"];
+      $bill_node->field_grand_total[$node->language][0]["value"] = $node->field_basegrandtotal[$node->language][0]["value"];
+      if ($node->field_paycurrencycode[$node->language][0]["value"] == 'EUR') {
+        $bill_node->field_grand_total_in_payment[$node->language][0]["value"] = $node->field_order_pay_grand_total[$node->language][0]["value"];
+      }
+      
+      // Zahlungstyp setzen
+      switch ($node->field_paymenttype[$node->language][0]["value"]) {
+        case 'PayPal.com':
+          $bill_node->field_bill_paymenttype[$node->language][0]["value"] = $language == 'de' ? 'PayPal' : 'PayPal';
+          break;
+          
+        case 'IBAN':
+          $bill_node->field_bill_paymenttype[$node->language][0]["value"] = $language == 'de' ? 'Überweisung' : 'bank transfer';          
+          break;        
+          
+        case 'Bank Transfer':
+          $bill_node->field_bill_paymenttype[$node->language][0]["value"] = $language == 'de' ? 'Überweisung' : 'bank transfer';          
+          break;
+        
+        
+        default:
+          
+          break;
+      }
+      
+      // Node speichern
+      if ($bill_node = node_submit($bill_node)) {
+        node_save($bill_node);      
+      }
+    }
+  }
+}
+
 /* 
  * Implements hook_menu().
  */
@@ -135,7 +275,7 @@ function bricks_bill_crawler_start_crawler() {
       }
       // crawl item label    
       foreach ($order_node->field_orderitemid[$order_node->language] as $key => $value) {
-        if ($order_node->field_orderitemprice[$order_node->language][$key]["value"] > 50 && $order_node->field_orderitemtype[$order_node->language][$key]["value"] == 'S') {
+        if ($order_node->field_orderitemprice[$order_node->language][$key]["value"] >= 50 && $order_node->field_orderitemtype[$order_node->language][$key]["value"] == 'S') {
           // read item page
           $item = bricks_bill_crawler_get_item($login_session, $order_node->field_itemid[$order_node->language][$key]["value"]);
           if ($item == false) {
@@ -238,6 +378,27 @@ function bricks_bill_crawler_load_order_nodes($limit = 10) {
   }
     
   return $order_nodes;
+}
+
+/*
+ * load bill node to check
+ */
+function bricks_bill_crawler_load_bill_nodes($title) {
+  $bill_nodes = array();
+  $query = new EntityFieldQuery;
+
+  $query->entityCondition('entity_type', 'node')
+        ->propertyCondition('type', 'bill')
+        ->propertyCondition('title', $title)
+        ->range(0, 1);
+    
+  foreach ($query->execute() as $entity_type => $entities) {
+      foreach ($entities as $entity_id => $entity) {
+        $bill_nodes[] =  $entity;
+      }
+  }
+    
+  return $bill_nodes;
 }
 
 function br2nl($string) {
