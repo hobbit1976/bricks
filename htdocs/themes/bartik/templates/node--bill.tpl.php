@@ -3,7 +3,7 @@
   $add_vat = $content['field_add_vat']['#items'][0]["value"];
   // PAYCURRENCYCODE
   $payment_code = 'EUR';
-  if (strpos($content['field_grand_total_in_payment']['#items'][0]["value"], 'EUR') == FALSE) {
+  if (strpos($content['field_grand_total_in_payment']['#items'][0]["value"], 'EUR') === FALSE) {
     $payment_code = '$';
     $bricks_bill_grand_total_payment_value = str_replace('US&nbsp;$', '', $content['field_grand_total_in_payment']['#items'][0]["value"]);
   }
@@ -43,6 +43,12 @@
     $bricks_bill_table_header_total_price = 'Gesamtpreis netto';
     $bricks_bill_grand_total = 'Endsumme';
     $bricks_bill_grand_total_payment = 'Endsumme in Zahlwährung';
+    $bricks_bill_not_vat_text = 'Rechnung gem. § 25a UStG (Anwendung der Differenzbesteuerung, MwSt. nicht ausweisbar)';
+    $bricks_bill_text_paymenttype = 'Die Zahlung erfolgte per'; 
+    $bricks_bill_text_signatur = 'Vielen Dank für Deine Bestellung!<br /><br />Mit freundlichen Grüßen,<br />Dein 44 Bricks Team';
+    $bricks_bill_text_footer_1 = '<b>Geschäftsführer:</b><br />Richard Müller, Dennis Becker<br /><br /><b>Sitz der Gesellschaft:</b><br />Dresden';
+    $bricks_bill_text_footer_2 = '<b>Gerichtsstand:</b><br />HRB 29817 Amtsgericht Dresden<br /><br />USt-IdNr. DE276778872<br />St.-Nr. 202/106/08762';
+    $bricks_bill_text_footer_3 = '<b>Bankverbindung:</b><br />Dresdner Volksbank Raiffeisenbank eG<br />Konto-Nr. 3136071008<br />BLZ: 85090000<br />IBAN: DE08 8509 0000 3136 0710 08<br />SWIFT: GENODEF1DRS';
     
   }
   else {
@@ -80,7 +86,12 @@
     $bricks_bill_table_header_total_price = 'Total Price net';
     $bricks_bill_grand_total = 'Grant-total';
     $bricks_bill_grand_total_payment = 'Grand-total in payment currency';
-    
+    $bricks_bill_not_vat_text = 'Invoice according to § 25a UStG (subject to differential taxation, VAT cannot be stated separately)';
+    $bricks_bill_text_paymenttype = 'The payment has been made via'; 
+    $bricks_bill_text_signatur = 'Thank you very much for your order!<br /><br />Best regards,<br />Your 44 Bricks Team';
+    $bricks_bill_text_footer_1 = '<b>Managing Directors:</b><br />Richard Müller, Dennis Becker<br /><br /><b>Registered Office:</b><br />Dresden';
+    $bricks_bill_text_footer_2 = '<b>Court of Jurisdiction:</b><br />HRB 29817 Amtsgericht Dresden<br /><br />VAT-ID: DE276778872<br />Tax-ID: 202/106/08762';  
+    $bricks_bill_text_footer_3 = '<b>Bank Details:</b><br />Dresdner Volksbank Raiffeisenbank eG<br />Account-No. 3136071008<br />BLZ: 85090000<br />IBAN: DE08 8509 0000 3136 0710 08<br />SWIFT: GENODEF1DRS';  
     
   }
   $raw_items = '';
@@ -105,7 +116,7 @@
           ' . number_format($content['field_bill_items_unit_price']['#items'][$key]["value"], 2, ',', '.') . ' €
         </div>
         <div style="width: 2.25cm; display: table-cell; border-left: 0.1mm solid grey; text-align: right; padding-left: 2mm; padding-right: 2mm">
-          ' . number_format($content['field_bill_items_total_price']['#items'][$key]["value"], 2, ',', '.') . ' €
+          ' . number_format(($content['field_bill_items_total_price']['#items'][$key]["value"] * ($add_vat ==1 ? 0.81 : 1)), 2, ',', '.') . ' €
         </div>
       </div>'    
     ;
@@ -153,7 +164,7 @@
   <div style="position: relative; padding-left: 2mm; padding-right: 2mm">
     <?php print $bricks_bill_salutation; ?><div style="float: left"><?php print render($content['field_bill_salutation']); ?></div><div>,</div>
     <br />
-    <?php print $bricks_bill_salutation_part_2; ?><div style="float: left"><?php print render($content['field_bill_order_id']); ?></div><?php print $bricks_bill_salutation_part_3; ?>
+    <?php print $bricks_bill_salutation_part_2; ?><div style="float: left"><?php print render($content['title']); ?></div><?php print $bricks_bill_salutation_part_3; ?>
     <br />
     
   </div>
@@ -201,7 +212,7 @@
         <?php print number_format($content['field_shipping_packaging']['#items'][0]["value"], 2, ',', '.'); ?> €
       </div>
       <div style="width: 2.25cm; display: table-cell; border-left: 0.1mm solid grey; text-align: right; padding-left: 2mm; padding-right: 2mm">
-        <?php print number_format($content['field_shipping_packaging']['#items'][0]["value"], 2, ',', '.'); ?> €
+        <?php print number_format(($content['field_shipping_packaging']['#items'][0]["value"] * ($add_vat ==1 ? 0.81 : 1)), 2, ',', '.'); ?> €
       </div>
     </div>    
     
@@ -222,11 +233,11 @@
         <?php print $bricks_bill_sub_total; ?>
       </div>
       <div style="width: 2.25cm; display: table-cell; border-left: 0.1mm solid grey; text-align: right; padding-left: 2mm; padding-right: 2mm">
-        <?php print number_format($content['field_sub_total']['#items'][0]["value"], 2, ',', '.'); ?> €
+        <?php print number_format(($content['field_sub_total']['#items'][0]["value"] * ($add_vat ==1 ? 0.81 : 1)), 2, ',', '.'); ?> €
       </div>
     </div> 
     
-    <?php if ($add_vat == '1'): ?>
+    <?php if ($add_vat == 1): ?>
     <div class="bill-items" style="border-bottom: 0.1mm solid grey; border-top: 0.1mm solid grey; display: table-row; position: relative; width: 100%; font-weight: bold">
       <div style="width: 1.0cm; display: table-cell; padding-left: 2mm; padding-right: 2mm">
         <?php print ' '; ?>
@@ -266,7 +277,7 @@
         <?php print $bricks_bill_grand_total;?>
       </div>
       <div style="width: 2.25cm; display: table-cell; border-left: 0.1mm solid grey; text-align: right; padding-left: 2mm; padding-right: 2mm">
-        <?php print number_format(($content['field_grand_total']['#items'][0]["value"]*0.19), 2, ',', '.'); ?> €
+        <?php print number_format($content['field_grand_total']['#items'][0]["value"], 2, ',', '.'); ?> €
       </div>
     </div>
     
@@ -281,10 +292,10 @@
       <div style="width: 5.0cm; display: table-cell; padding-left: 2mm; padding-right: 2mm">
         <?php print ' '; ?>
       </div>
-      <div style="width: 1.5cm; display: table-cell; padding-left: 2mm; padding-right: 2mm">
+      <div style="width: 0.5cm; display: table-cell; padding-left: 2mm; padding-right: 2mm">
         <?php print ' '; ?>
       </div>
-      <div style="width: 2.25cm; display: table-cell; padding-left: 2mm; padding-right: 2mm; text-align: right">
+      <div style="width: 3.25cm; display: table-cell; padding-left: 2mm; padding-right: 2mm; text-align: right">
         <?php print $bricks_bill_grand_total_payment;?>
       </div>
       <div style="width: 2.25cm; display: table-cell; border-left: 0.1mm solid grey; text-align: right; padding-left: 2mm; padding-right: 2mm">
@@ -296,20 +307,30 @@
         
   </div>
   
-  <div style="position: relative; padding-left: 2mm; padding-right: 2mm">
-    Text
+  <div style="position: relative; padding-left: 2mm; padding-right: 2mm; padding-top: 5mm">
+    <?php if ($add_vat != 1): ?>
+      <p>
+      <?php print $bricks_bill_not_vat_text; ?>
+      </p>
+    <?php endif;?>
+    <p>
+      <?php print $bricks_bill_text_paymenttype . ' ' . $content['field_bill_paymenttype']['#items'][0]["value"]; ?>.
+    </p>
+    <p>
+      <?php print $bricks_bill_text_signatur; ?>
+    </p>
   </div>
   
   <div style="display: table; position: absolute; bottom: 0px; border-top: 0.1mm solid grey; width: 100%;">
     <div style="display: table-row; height: 2.5cm; color: #666666">
       <div style="display: table-cell; width: 5.0cm; padding-left: 2mm; padding-right: 2mm;">
-        Text
+        <?php print $bricks_bill_text_footer_1; ?>
       </div>
       <div style="display: table-cell; width: 5.25cm; border-left: 0.1mm solid grey; padding-left: 2mm; padding-right: 2mm;">
-        Text
+        <?php print $bricks_bill_text_footer_2; ?>
       </div>
       <div style="display: table-cell; border-left: 0.1mm solid grey; padding-left: 2mm; padding-right: 2mm;">
-        Text
+        <?php print $bricks_bill_text_footer_3; ?>
       </div>
     </div>
   </div>
