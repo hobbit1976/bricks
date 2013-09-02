@@ -1,5 +1,12 @@
 <?php
-
+  // incl. MwSt.
+  $add_vat = $content['field_add_vat']['#items'][0]["value"];
+  // PAYCURRENCYCODE
+  $payment_code = 'EUR';
+  if (strpos($content['field_grand_total_in_payment']['#items'][0]["value"], 'EUR') == FALSE) {
+    $payment_code = '$';
+    $bricks_bill_grand_total_payment_value = str_replace('US&nbsp;$', '', $content['field_grand_total_in_payment']['#items'][0]["value"]);
+  }
   // Textbausteine
   if ($content['field_bill_language']['#items'][0]['value'] == 'de') {
     $bricks_address_small = '44 Bricks UG (haftungsbeschränkt) | Königstr. 17 | D-01097 Dresden | Deutschland';
@@ -26,6 +33,16 @@
     $bricks_bill_salutation_part_3 = '<div style="float: rigth">&nbsp;berechnen wir Dir folgenden Auftrag:</div>';
     $bricks_bill_shipping_parts_1 = 'V';
     $bricks_bill_shipping_parts_2 = 'Verpackung & Versand';
+    $bricks_bill_sub_total = 'Zwischensumme';
+    $bricks_bill_add_vat = '(zzgl. 19% MwSt.)';
+    $bricks_bill_table_header_item = 'Pos.';
+    $bricks_bill_table_header_artno = 'Art.Nr.';
+    $bricks_bill_table_header_desc = 'Beschreibung';
+    $bricks_bill_table_header_quanti = 'Menge';
+    $bricks_bill_table_header_unit_price = 'Einzelpreis netto';
+    $bricks_bill_table_header_total_price = 'Gesamtpreis netto';
+    $bricks_bill_grand_total = 'Endsumme';
+    $bricks_bill_grand_total_payment = 'Endsumme in Zahlwährung';
     
   }
   else {
@@ -53,6 +70,16 @@
     $bricks_bill_salutation_part_3 = '<div style="float: rigth">&nbsp;we invoice you for the following goods:</div>';
     $bricks_bill_shipping_parts_1 = 'S';
     $bricks_bill_shipping_parts_2 = 'Shipping & Packaging';
+    $bricks_bill_sub_total = 'Sub-total';
+    $bricks_bill_add_vat = '(add. 19% VAT)';
+    $bricks_bill_table_header_item = 'Item';
+    $bricks_bill_table_header_artno = 'Art.No.';
+    $bricks_bill_table_header_desc = 'Description';
+    $bricks_bill_table_header_quanti = 'Quantity';
+    $bricks_bill_table_header_unit_price = 'Unit Price net';
+    $bricks_bill_table_header_total_price = 'Total Price net';
+    $bricks_bill_grand_total = 'Grant-total';
+    $bricks_bill_grand_total_payment = 'Grand-total in payment currency';
     
     
   }
@@ -75,10 +102,10 @@
           ' . $content['field_bill_items_quantity']['#items'][$key]["value"] . '
         </div>
         <div style="width: 2.25cm; display: table-cell; border-left: 0.1mm solid grey; text-align: right; padding-left: 2mm; padding-right: 2mm">
-          ' . $content['field_bill_items_unit_price']['#items'][$key]["value"] . ' €
+          ' . number_format($content['field_bill_items_unit_price']['#items'][$key]["value"], 2, ',', '.') . ' €
         </div>
         <div style="width: 2.25cm; display: table-cell; border-left: 0.1mm solid grey; text-align: right; padding-left: 2mm; padding-right: 2mm">
-          ' . $content['field_bill_items_total_price']['#items'][$key]["value"] . ' €
+          ' . number_format($content['field_bill_items_total_price']['#items'][$key]["value"], 2, ',', '.') . ' €
         </div>
       </div>'    
     ;
@@ -136,22 +163,22 @@
   <div style="position: relative; display: table; font-size: 8px; border-collapse: collapse; margin-left: auto; margin-right: auto; border-left: 0.1mm solid grey; border-right: 0.1mm solid grey">
     <div style="border-bottom: 0.1mm solid grey; border-top: 0.1mm solid grey; display: table-row; position: relative; width: 100%; font-weight: bold">
       <div style="width: 1.0cm; display: table-cell; padding-left: 2mm; padding-right: 2mm">
-        Pos.
+        <?php print $bricks_bill_table_header_item; ?>
       </div>
       <div style="width: 1.5cm; display: table-cell; padding-left: 2mm; padding-right: 2mm; border-left: 0.1mm solid grey">
-        Art.Nr.
+        <?php print $bricks_bill_table_header_artno; ?>
       </div>
       <div style="width: 5.0cm; display: table-cell; padding-left: 2mm; padding-right: 2mm; border-left: 0.1mm solid grey">
-        Beschreibung
+        <?php print $bricks_bill_table_header_desc; ?>
       </div>
       <div style="width: 1.5cm; display: table-cell; padding-left: 2mm; padding-right: 2mm; border-left: 0.1mm solid grey; text-align: right">
-        Menge
+        <?php print $bricks_bill_table_header_quanti; ?>
       </div>
       <div style="width: 2.25cm; display: table-cell; padding-left: 2mm; padding-right: 2mm; border-left: 0.1mm solid grey; text-align: right">
-        Einzelpreis netto
+        <?php print $bricks_bill_table_header_unit_price; ?>
       </div>
       <div style="width: 2.25cm; display: table-cell; padding-left: 2mm; padding-right: 2mm; border-left: 0.1mm solid grey; text-align: right">
-        Gesamtpreis netto
+        <?php print $bricks_bill_table_header_total_price; ?>
       </div>
     </div>
     
@@ -171,12 +198,100 @@
         1
       </div>
       <div style="width: 2.25cm; display: table-cell; border-left: 0.1mm solid grey; text-align: right; padding-left: 2mm; padding-right: 2mm">
-        <?php print $content['field_shipping_packaging']['#items'][0]["value"]; ?> €
+        <?php print number_format($content['field_shipping_packaging']['#items'][0]["value"], 2, ',', '.'); ?> €
       </div>
       <div style="width: 2.25cm; display: table-cell; border-left: 0.1mm solid grey; text-align: right; padding-left: 2mm; padding-right: 2mm">
-        <?php print $content['field_shipping_packaging']['#items'][0]["value"]; ?> €
+        <?php print number_format($content['field_shipping_packaging']['#items'][0]["value"], 2, ',', '.'); ?> €
+      </div>
+    </div>    
+    
+    <div class="bill-items" style="border-bottom: 0.1mm solid grey; border-top: 0.1mm solid grey; display: table-row; position: relative; width: 100%; font-weight: bold">
+      <div style="width: 1.0cm; display: table-cell; padding-left: 2mm; padding-right: 2mm">
+        <?php print ' '; ?>
+      </div>
+      <div style="width: 1.5cm; display: table-cell; padding-left: 2mm; padding-right: 2mm">
+        <?php print ' '; ?>
+      </div>
+      <div style="width: 5.0cm; display: table-cell; padding-left: 2mm; padding-right: 2mm">
+        <?php print ' '; ?>
+      </div>
+      <div style="width: 1.5cm; display: table-cell; padding-left: 2mm; padding-right: 2mm">
+        <?php print ' '; ?>
+      </div>
+      <div style="width: 2.25cm; display: table-cell; padding-left: 2mm; padding-right: 2mm; text-align: right">
+        <?php print $bricks_bill_sub_total; ?>
+      </div>
+      <div style="width: 2.25cm; display: table-cell; border-left: 0.1mm solid grey; text-align: right; padding-left: 2mm; padding-right: 2mm">
+        <?php print number_format($content['field_sub_total']['#items'][0]["value"], 2, ',', '.'); ?> €
+      </div>
+    </div> 
+    
+    <?php if ($add_vat == '1'): ?>
+    <div class="bill-items" style="border-bottom: 0.1mm solid grey; border-top: 0.1mm solid grey; display: table-row; position: relative; width: 100%; font-weight: bold">
+      <div style="width: 1.0cm; display: table-cell; padding-left: 2mm; padding-right: 2mm">
+        <?php print ' '; ?>
+      </div>
+      <div style="width: 1.5cm; display: table-cell; padding-left: 2mm; padding-right: 2mm">
+        <?php print ' '; ?>
+      </div>
+      <div style="width: 5.0cm; display: table-cell; padding-left: 2mm; padding-right: 2mm">
+        <?php print ' '; ?>
+      </div>
+      <div style="width: 1.5cm; display: table-cell; padding-left: 2mm; padding-right: 2mm">
+        <?php print ' '; ?>
+      </div>
+      <div style="width: 2.25cm; display: table-cell; padding-left: 2mm; padding-right: 2mm; text-align: right">
+        <?php print $bricks_bill_add_vat;?>
+      </div>
+      <div style="width: 2.25cm; display: table-cell; border-left: 0.1mm solid grey; text-align: right; padding-left: 2mm; padding-right: 2mm">
+        <?php print number_format(($content['field_sub_total']['#items'][0]["value"]*0.19), 2, ',', '.'); ?> €
       </div>
     </div>
+    <?php endif; ?>
+    
+    <div class="bill-items" style="border-bottom: 0.1mm solid grey; border-top: 0.1mm solid grey; display: table-row; position: relative; width: 100%; font-weight: bold">
+      <div style="width: 1.0cm; display: table-cell; padding-left: 2mm; padding-right: 2mm">
+        <?php print ' '; ?>
+      </div>
+      <div style="width: 1.5cm; display: table-cell; padding-left: 2mm; padding-right: 2mm">
+        <?php print ' '; ?>
+      </div>
+      <div style="width: 5.0cm; display: table-cell; padding-left: 2mm; padding-right: 2mm">
+        <?php print ' '; ?>
+      </div>
+      <div style="width: 1.5cm; display: table-cell; padding-left: 2mm; padding-right: 2mm">
+        <?php print ' '; ?>
+      </div>
+      <div style="width: 2.25cm; display: table-cell; padding-left: 2mm; padding-right: 2mm; text-align: right">
+        <?php print $bricks_bill_grand_total;?>
+      </div>
+      <div style="width: 2.25cm; display: table-cell; border-left: 0.1mm solid grey; text-align: right; padding-left: 2mm; padding-right: 2mm">
+        <?php print number_format(($content['field_grand_total']['#items'][0]["value"]*0.19), 2, ',', '.'); ?> €
+      </div>
+    </div>
+    
+    <?php if ($payment_code == '$'): ?>
+    <div class="bill-items" style="border-bottom: 0.1mm solid grey; border-top: 0.1mm solid grey; display: table-row; position: relative; width: 100%; font-weight: bold">
+      <div style="width: 1.0cm; display: table-cell; padding-left: 2mm; padding-right: 2mm">
+        <?php print ' '; ?>
+      </div>
+      <div style="width: 1.5cm; display: table-cell; padding-left: 2mm; padding-right: 2mm">
+        <?php print ' '; ?>
+      </div>
+      <div style="width: 5.0cm; display: table-cell; padding-left: 2mm; padding-right: 2mm">
+        <?php print ' '; ?>
+      </div>
+      <div style="width: 1.5cm; display: table-cell; padding-left: 2mm; padding-right: 2mm">
+        <?php print ' '; ?>
+      </div>
+      <div style="width: 2.25cm; display: table-cell; padding-left: 2mm; padding-right: 2mm; text-align: right">
+        <?php print $bricks_bill_grand_total_payment;?>
+      </div>
+      <div style="width: 2.25cm; display: table-cell; border-left: 0.1mm solid grey; text-align: right; padding-left: 2mm; padding-right: 2mm">
+        <?php print number_format($bricks_bill_grand_total_payment_value, 2, ',', '.'); ?> $
+      </div>
+    </div>
+    <?php endif; ?>
     
         
   </div>
