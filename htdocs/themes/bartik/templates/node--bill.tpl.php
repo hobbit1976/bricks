@@ -46,7 +46,7 @@
     $bricks_bill_not_vat_text = 'Rechnung gem. § 25a UStG (Anwendung der Differenzbesteuerung, MwSt. nicht ausweisbar)';
     $bricks_bill_text_paymenttype = 'Die Zahlung erfolgte per'; 
     $bricks_bill_text_signatur = 'Vielen Dank für Deine Bestellung!<br /><br />Mit freundlichen Grüßen,<br />Dein 44 Bricks Team';
-    $bricks_bill_text_footer_1 = '<b>Geschäftsführer:</b><br />Richard Müller, Dennis Becker<br /><br /><b>Sitz der Gesellschaft:</b><br />Dresden';
+    $bricks_bill_text_footer_1 = '<b>Geschäftsführer:</b><br />Richard Müller, Dennis Becker<br /><br /><b>Sitz der Gesellschaft:</b><br />Dresden, Deutschland';
     $bricks_bill_text_footer_2 = '<b>Gerichtsstand:</b><br />HRB 29817 Amtsgericht Dresden<br /><br />USt-IdNr. DE276778872<br />St.-Nr. 202/106/08762';
     $bricks_bill_text_footer_3 = '<b>Bankverbindung:</b><br />Dresdner Volksbank Raiffeisenbank eG<br />Konto-Nr. 3136071008<br />BLZ: 85090000<br />IBAN: DE08 8509 0000 3136 0710 08<br />SWIFT: GENODEF1DRS';
     
@@ -89,7 +89,7 @@
     $bricks_bill_not_vat_text = 'Invoice according to § 25a UStG (subject to differential taxation, VAT cannot be stated separately)';
     $bricks_bill_text_paymenttype = 'The payment has been made via'; 
     $bricks_bill_text_signatur = 'Thank you very much for your order!<br /><br />Best regards,<br />Your 44 Bricks Team';
-    $bricks_bill_text_footer_1 = '<b>Managing Directors:</b><br />Richard Müller, Dennis Becker<br /><br /><b>Registered Office:</b><br />Dresden';
+    $bricks_bill_text_footer_1 = '<b>Managing Directors:</b><br />Richard Müller, Dennis Becker<br /><br /><b>Registered Office:</b><br />Dresden, Germany';
     $bricks_bill_text_footer_2 = '<b>Court of Jurisdiction:</b><br />HRB 29817 Amtsgericht Dresden<br /><br />VAT-ID: DE276778872<br />Tax-ID: 202/106/08762';  
     $bricks_bill_text_footer_3 = '<b>Bank Details:</b><br />Dresdner Volksbank Raiffeisenbank eG<br />Account-No. 3136071008<br />BLZ: 85090000<br />IBAN: DE08 8509 0000 3136 0710 08<br />SWIFT: GENODEF1DRS';  
     
@@ -113,7 +113,7 @@
           ' . $content['field_bill_items_quantity']['#items'][$key]["value"] . '
         </div>
         <div style="width: 2.25cm; display: table-cell; border-left: 0.1mm solid grey; text-align: right; padding-left: 2mm; padding-right: 2mm">
-          ' . number_format($content['field_bill_items_unit_price']['#items'][$key]["value"], 2, ',', '.') . ' €
+          ' . number_format(($content['field_bill_items_unit_price']['#items'][$key]["value"] * ($add_vat ==1 ? 0.81 : 1)), 2, ',', '.') . ' €
         </div>
         <div style="width: 2.25cm; display: table-cell; border-left: 0.1mm solid grey; text-align: right; padding-left: 2mm; padding-right: 2mm">
           ' . number_format(($content['field_bill_items_total_price']['#items'][$key]["value"] * ($add_vat ==1 ? 0.81 : 1)), 2, ',', '.') . ' €
@@ -209,7 +209,7 @@
         1
       </div>
       <div style="width: 2.25cm; display: table-cell; border-left: 0.1mm solid grey; text-align: right; padding-left: 2mm; padding-right: 2mm">
-        <?php print number_format($content['field_shipping_packaging']['#items'][0]["value"], 2, ',', '.'); ?> €
+        <?php print number_format(($content['field_shipping_packaging']['#items'][0]["value"] * ($add_vat ==1 ? 0.81 : 1)), 2, ',', '.'); ?> €
       </div>
       <div style="width: 2.25cm; display: table-cell; border-left: 0.1mm solid grey; text-align: right; padding-left: 2mm; padding-right: 2mm">
         <?php print number_format(($content['field_shipping_packaging']['#items'][0]["value"] * ($add_vat ==1 ? 0.81 : 1)), 2, ',', '.'); ?> €

@@ -116,8 +116,8 @@ function bricks_bill_crawler_node_update($node) {
       
       $bill_node->field_sub_total[$node->language][0]["value"] = $node->field_basegrandtotal[$node->language][0]["value"];
       $bill_node->field_grand_total[$node->language][0]["value"] = $node->field_basegrandtotal[$node->language][0]["value"];
-      
-      if ($node->field_paycurrencycode[$node->language][0]["value"] == 'EUR') {
+
+      if ($node->field_paycurrencycode[$node->language][0]["value"] != 'EUR') {
         $bill_node->field_grand_total_in_payment[$node->language][0]["value"] = $node->field_order_pay_grand_total[$node->language][0]["value"];
       }
       
@@ -208,9 +208,19 @@ function bricks_bill_crawler_get_item($login_session, $item_id) {
 function bricks_bill_crawler_order_crawl($order) {
   include_once('simple_html_dom.php');
   $buyer = array();
-  $html = str_get_html($order);
-  foreach($html->find('table', 0)->find('font', 1)->find('table', 0)->find('tr', 0)->find('table', 1)->find('tr', 6)->find('b') as $element) {
-   $buyer['pay_grand'] = strip_tags((string) $element);
+//  $html = str_get_html($order);
+//  foreach($html->find('table', 0)->find('font', 1)->find('table', 0)->find('tr', 0)->find('table', 1)->find('tr', 6)->find('b') as $element) {
+//   $buyer['pay_grand'] = strip_tags((string) $element);
+//  }
+  $start_pos_pay_grand = stripos($order, 'Pay&nbsp;Grand&nbsp;Total:');
+  if ($start_pos_pay_grand !== FALSE) {
+    $grand_total_block = substr($order, $start_pos_pay_grand, 100);
+    $start_pos_pay_grand = stripos($grand_total_block, '<B>') + 3;
+    $end_pos_pay_grand = stripos($grand_total_block, '</B>');
+    $buyer['pay_grand'] = substr($grand_total_block, $start_pos_pay_grand, $end_pos_pay_grand-$start_pos_pay_grand);
+  }
+  else {
+    $buyer['pay_grand'] = '';
   }
   $start_pos_buyer_block = stripos($order, '<b>Buyer Information</b>');
   $end_pos_buyer_block = stripos($order, '<b>Seller Information</b>');
@@ -254,7 +264,7 @@ function bricks_bill_crawler_item_crawl($item) {
  */
 function bricks_bill_crawler_start_crawler_test() {
   $login_session = bricks_bill_crawler_login_bricklink();
-  $item = bricks_bill_crawler_get_order($login_session, '3654022');
+  $item = bricks_bill_crawler_get_order($login_session, '3636695');
   $crawl_order = bricks_bill_crawler_order_crawl($item);var_dump($crawl_order);
 } 
 
