@@ -164,8 +164,14 @@ function bricks_bill_crawler_menu() {
     'title' => 'Bricks bill crawler',
     'page callback' => 'bricks_bill_crawler_start_crawler_test',
     'access arguments' => array('access content overview'),
+    'type' => MENU_CALLBACK,
   );
   
+  $items['savePDF'] = array(
+    'title' => 'Save node as PDF',
+    'page callback' => 'bricks_bill_crawler_save_pdf',
+    'access arguments' => array('access content overview'),
+  );
   
   return $items;
 }
@@ -265,7 +271,7 @@ function bricks_bill_crawler_item_crawl($item) {
 function bricks_bill_crawler_start_crawler_test() {
   $login_session = bricks_bill_crawler_login_bricklink();
   $item = bricks_bill_crawler_get_order($login_session, '3636695');
-  $crawl_order = bricks_bill_crawler_order_crawl($item);var_dump($crawl_order);
+  $crawl_order = bricks_bill_crawler_order_crawl($item);
 } 
 
 /*
@@ -419,6 +425,55 @@ function bricks_bill_crawler_load_bill_nodes($title) {
   }
     
   return $bill_nodes;
+}
+
+/*
+ * load bill node to check
+ */
+function bricks_bill_crawler_save_pdf() {
+  require_once(DRUPAL_ROOT . '/' . drupal_get_path('module', 'print_pdf') . '/print_pdf.pages.inc');
+  // Disable caching for generated PDFs, as Drupal doesn't ouput the proper headers from the cache
+  $GLOBALS['conf']['cache'] = FALSE;
+
+  $args = func_get_args();
+  $path = filter_xss(implode('/', $args));
+  $cid = isset($_GET['comment']) ? (int)$_GET['comment'] : NULL;
+
+  // Handle the query
+  $query = $_GET;
+  unset($query['q']);
+ 
+  if (!empty($path)) {
+    if ($alias = drupal_lookup_path('source', $path)) {
+      // Alias
+      $path_arr = explode('/', $alias);
+      $node = node_load($path_arr[1]);
+    }
+    elseif (ctype_digit($args[0])) {
+      // normal nid
+      $node = node_load($args[0]);
+    }
+
+    $pdf_filename = variable_get('print_pdf_filename', PRINT_PDF_FILENAME_DEFAULT);
+    if (!empty($pdf_filename) && !empty($node)) {
+      $pdf_filename = token_replace($pdf_filename, array('node' => $node));
+    }
+    else {
+      $pdf_filename = token_replace($pdf_filename, array('site'));
+      if (empty($pdf_filename) || count(token_scan($pdf_filename))) {
+        // If there are still tokens, use a fallback solution
+        $pdf_filename = str_replace('/', '_', $path);
+      }
+    }
+  }
+  else {
+    $pdf_filename = 'page';
+  }
+  $pdf = print_pdf_generate_path($path, $query, $cid);  
+  $filename = 'rechnungen/' . str_replace('/', '-', $node->field_bill_number[$node->language][0]["value"]) . '.pdf' ;
+  $file = file_save_data($pdf, 'public://'.$filename);
+
+  drupal_goto('node/' . $node->nid);
 }
 
 function br2nl($string) {

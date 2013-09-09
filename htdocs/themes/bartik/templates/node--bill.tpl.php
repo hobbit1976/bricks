@@ -164,7 +164,7 @@
   <div style="position: relative; padding-left: 2mm; padding-right: 2mm">
     <?php print $bricks_bill_salutation; ?><div style="float: left"><?php print render($content['field_bill_salutation']); ?></div><div>,</div>
     <br />
-    <?php print $bricks_bill_salutation_part_2; ?><div style="float: left"><?php print render($content['title']); ?></div><?php print $bricks_bill_salutation_part_3; ?>
+    <?php print $bricks_bill_salutation_part_2; ?><div style="float: left"><?php print $node->title; ?></div><?php print $bricks_bill_salutation_part_3; ?>
     <br />
     
   </div>
@@ -305,7 +305,7 @@
     <?php endif; ?>
     
         
-  </div>
+  </div>  
   
   <div style="position: relative; padding-left: 2mm; padding-right: 2mm; padding-top: 5mm">
     <?php if ($add_vat != 1): ?>
@@ -320,6 +320,8 @@
       <?php print $bricks_bill_text_signatur; ?>
     </p>
   </div>
+  
+  <div style="position: relative; margin-left: auto; margin-right: auto; width: 100px; font-size: 16px"><?php print l('PDF erzeugen', 'savePDF/' . $node->nid) ?></div>
   
   <div style="display: table; position: absolute; bottom: 0px; border-top: 0.1mm solid grey; width: 100%;">
     <div style="display: table-row; height: 2.5cm; color: #666666">
