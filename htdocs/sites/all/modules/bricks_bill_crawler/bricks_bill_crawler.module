@@ -50,6 +50,9 @@ function bricks_bill_crawler_node_update($node) {
       node_object_prepare($bill_node);
       // UID auf Admin setzen
       $bill_node->uid = 1;
+      // nicht voröffentlichen
+      $bill_node->status = 0;
+      $bill_node->promote = 0;
       // Sprache auf neutral setzen
       $bill_node->language = LANGUAGE_NONE;
       // OrderID als Titel setzen
@@ -69,12 +72,16 @@ function bricks_bill_crawler_node_update($node) {
       $bill_node->field_bill_salutation[$node->language][0]["value"] = $address_array[0];
       // Adresse setzen
       $bill_node->field_bill_address[$node->language][0]["value"] = $node->field_order_address[$node->language][0]["value"];
-      
+      // Herkunftsland setzen
+      $bill_node->field_bill_country[$node->language][0]["value"] = $node->field_order_country[$node->language][0]["value"];
+      // PDF-Erzeugung setzen
+      $bill_node->field_bill_check_pdf[$node->language][0]["value"] = 0;
       // Order Items setzen
       $sum_extra_parts = 0;
       $item_numbers = 1;
       $number_standard_items = 0;      
       $number_extra_items = 0;
+      $sum_standard_items = 0.00;
       
       foreach ($node->field_orderitemid[$node->language] as $key => $value) {
         // extra items
@@ -98,6 +105,7 @@ function bricks_bill_crawler_node_update($node) {
         // standard items
         else {
           $number_standard_items++;
+          $sum_standard_items = $sum_standard_items + ($node->field_orderitemprice[$node->language][$key]['value'] + $node->field_orderitemqty[$node->language][$key]['value']);
         }
       }
       
@@ -105,20 +113,46 @@ function bricks_bill_crawler_node_update($node) {
       $bill_node->field_shipping_packaging[$node->language][0]["value"] = $node->field_ordershipping[$node->language][0]["value"] + $node->field_orderinsurance[$node->language][0]["value"] + $node->field_orderaddchrg1[$node->language][0]["value"]; 
     
       // standard item setzen
-      if ($number_standard_items > 0) {             
+      if ($number_standard_items > 0 || $node->field_orderaddchrg2[$node->language][0]["value"] > 0) {             
         $bill_node->field_bill_items_item[$node->language][]["value"] = $item_numbers;
         $bill_node->field_bill_items_number[$node->language][]["value"] = 1;
         $bill_node->field_bill_items_description[$node->language][]["value"] = $language == 'de' ? 'LEGO Einzelteile' : 'LEGO Parts';
         $bill_node->field_bill_items_quantity[$node->language][]["value"] = 1;
-        $bill_node->field_bill_items_unit_price[$node->language][]["value"] = $node->field_basegrandtotal[$node->language][0]["value"] - $bill_node->field_shipping_packaging[$node->language][0]["value"] - $sum_extra_parts;
-        $bill_node->field_bill_items_total_price[$node->language][]["value"] = $node->field_basegrandtotal[$node->language][0]["value"] - $bill_node->field_shipping_packaging[$node->language][0]["value"] - $sum_extra_parts;        
+        $bill_node->field_bill_items_unit_price[$node->language][]["value"] = $sum_standard_items + $node->field_orderaddchrg2[$node->language][0]["value"];
+        $bill_node->field_bill_items_total_price[$node->language][]["value"] = $sum_standard_items + $node->field_orderaddchrg2[$node->language][0]["value"];
+        $item_numbers++;        
       }
       
-      $bill_node->field_sub_total[$node->language][0]["value"] = $node->field_basegrandtotal[$node->language][0]["value"];
-      $bill_node->field_grand_total[$node->language][0]["value"] = $node->field_basegrandtotal[$node->language][0]["value"];
+//      $bill_node->field_sub_total[$node->language][0]["value"] = $node->field_basegrandtotal[$node->language][0]["value"];
+//      $bill_node->field_grand_total[$node->language][0]["value"] = $node->field_basegrandtotal[$node->language][0]["value"];
 
       if ($node->field_paycurrencycode[$node->language][0]["value"] != 'EUR') {
         $bill_node->field_grand_total_in_payment[$node->language][0]["value"] = $node->field_order_pay_grand_total[$node->language][0]["value"];
+      }
+      
+      
+      // Versand setzen 
+      // $bill_node->field_shipping_packaging[$node->language][0]["value"] = $node->field_ordershipping[$node->language][0]["value"] + $node->field_orderinsurance[$node->language][0]["value"] + $node->field_orderaddchrg1[$node->language][0]["value"]; 
+    
+      if ($node->field_ordershipping[$node->language][0]["value"] > 0 || $node->field_orderinsurance[$node->language][0]["value"] > 0 || $node->field_orderaddchrg1[$node->language][0]["value"] > 0) {             
+        $bill_node->field_bill_items_item[$node->language][]["value"] = $item_numbers;
+        $bill_node->field_bill_items_number[$node->language][]["value"] = $language == 'de' ? 'V' : 'S';
+        $bill_node->field_bill_items_description[$node->language][]["value"] = $language == 'de' ? 'Verpackung & Versand' : 'Shipping & Packaging';
+        $bill_node->field_bill_items_quantity[$node->language][]["value"] = 1;
+        $bill_node->field_bill_items_unit_price[$node->language][]["value"] = $node->field_ordershipping[$node->language][0]["value"] + $node->field_orderinsurance[$node->language][0]["value"] + $node->field_orderaddchrg1[$node->language][0]["value"];
+        $bill_node->field_bill_items_total_price[$node->language][]["value"] = $node->field_ordershipping[$node->language][0]["value"] + $node->field_orderinsurance[$node->language][0]["value"] + $node->field_orderaddchrg1[$node->language][0]["value"];
+        $item_numbers++;        
+      }
+      
+      // Rabatt setzen
+      if ($node->field_ordercredit[$node->language][0]["value"] > 0 || $node->field_ordercreditcoupon[$node->language][0]["value"] > 0) {           
+        $bill_node->field_bill_items_item[$node->language][]["value"] = $item_numbers;
+        $bill_node->field_bill_items_number[$node->language][]["value"] = $language == 'de' ? 'R' : 'C';
+        $bill_node->field_bill_items_description[$node->language][]["value"] = $language == 'de' ? 'Rabatt' : 'Credit';
+        $bill_node->field_bill_items_quantity[$node->language][]["value"] = 1;
+        $bill_node->field_bill_items_unit_price[$node->language][]["value"] = -1 * ($node->field_ordercredit[$node->language][0]["value"] + $node->field_ordercreditcoupon[$node->language][0]["value"]);
+        $bill_node->field_bill_items_total_price[$node->language][]["value"] = -1 * ($node->field_ordercredit[$node->language][0]["value"] + $node->field_ordercreditcoupon[$node->language][0]["value"]);
+        
       }
       
       
@@ -170,6 +204,12 @@ function bricks_bill_crawler_menu() {
   $items['savePDF'] = array(
     'title' => 'Save node as PDF',
     'page callback' => 'bricks_bill_crawler_save_pdf',
+    'access arguments' => array('access content overview'),
+  );
+  
+  $items['sendMail'] = array(
+    'title' => 'Send PDF as Mail',
+    'page callback' => 'bricks_bill_crawler_send_pdf_as_mail',
     'access arguments' => array('access content overview'),
   );
   
@@ -269,9 +309,11 @@ function bricks_bill_crawler_item_crawl($item) {
  * start crawler test
  */
 function bricks_bill_crawler_start_crawler_test() {
-  $login_session = bricks_bill_crawler_login_bricklink();
-  $item = bricks_bill_crawler_get_order($login_session, '3636695');
-  $crawl_order = bricks_bill_crawler_order_crawl($item);
+  $node = new stdClass();
+  $node->field_bill_country['und'][0]["value"] = 'Germany';
+  $node->field_add_vat['und'][0]["value"] = 1;
+  $node->language = 'und';
+  $path = bricks_bill_crawler_get_folder_to_save($node);var_dump($path);
 } 
 
 /*
@@ -430,6 +472,38 @@ function bricks_bill_crawler_load_bill_nodes($title) {
 /*
  * load bill node to check
  */
+function bricks_bill_crawler_send_pdf_as_mail() {
+
+  $args = func_get_args();
+  $path = filter_xss(implode('/', $args));
+
+  // Handle the query
+  $query = $_GET;
+  unset($query['q']);
+
+  if (!empty($path)) {
+    if ($alias = drupal_lookup_path('source', $path)) {
+      // Alias
+      $path_arr = explode('/', $alias);
+      $node = node_load($path_arr[1]);
+    }
+    elseif (ctype_digit($args[0])) {
+      // normal nid
+      $node = node_load($args[0]);
+    }
+      $node->file = str_replace('public://', DRUPAL_ROOT . '/sites/default/files/', bricks_bill_crawler_get_folder_to_save($node) . '/' . str_replace('/', '-', $node->field_bill_number[$node->language][0]["value"]) . '.pdf') ;
+      $node->filename = str_replace('/', '-', $node->field_bill_number[$node->language][0]["value"]) . '.pdf';
+      bricks_bill_crawler_mail_send_bill($node);
+      drupal_set_message('Mail erfolgreich versendet.');
+      //drupal_goto('node/' . $node->nid);
+  }
+  
+  drupal_set_message('Fehler beim Mailversand', 'warning');
+}
+
+/*
+ * load bill node to check
+ */
 function bricks_bill_crawler_save_pdf() {
   require_once(DRUPAL_ROOT . '/' . drupal_get_path('module', 'print_pdf') . '/print_pdf.pages.inc');
   // Disable caching for generated PDFs, as Drupal doesn't ouput the proper headers from the cache
@@ -470,10 +544,109 @@ function bricks_bill_crawler_save_pdf() {
     $pdf_filename = 'page';
   }
   $pdf = print_pdf_generate_path($path, $query, $cid);  
-  $filename = 'rechnungen/' . str_replace('/', '-', $node->field_bill_number[$node->language][0]["value"]) . '.pdf' ;
-  $file = file_save_data($pdf, 'public://'.$filename);
+  $filename = bricks_bill_crawler_get_folder_to_save($node) . '/' . str_replace('/', '-', $node->field_bill_number[$node->language][0]["value"]) . '.pdf' ;
+  $file = file_save_data($pdf, $filename);
+  if ($file !== FALSE) {
+    $node->field_bill_check_pdf[$node->language][0]["value"] = 1;
+    node_save($node);
+  }
 
   drupal_goto('node/' . $node->nid);
+}
+
+/*
+ * check and create folder to save
+ */
+function bricks_bill_crawler_get_folder_to_save($node) {
+    
+  $path = 'rechnungen/';
+  $path_eu_vat = $path . 'eu-vat/';
+  $path_eu_non_vat = $path . 'eu-non-vat/';
+  $path_non_eu = $path . 'non-eu/';
+  $new_folder = false;
+  
+  $eu_country_array = array(
+    'Austria',
+    'Belgium',
+    'Bulgaria',
+    'Croatia',
+    'Czech Republic',
+    'Cyprus',
+    'Denmark',
+    'Estonia',
+    'Finland',
+    'France',
+    'Germany',
+    'Greece',
+    'Hungary',
+    'Ireland',
+    'Italy',
+    'Latvia',
+    'Lithuania',
+    'Luxembourg',
+    'Malta',
+    'Netherlands',
+    'Poland',
+    'Portugal',
+    'Romania',
+    'Slovakia',
+    'Slovenia',
+    'Spain',
+    'Sweden',
+    'United Kingdom',
+  );
+  
+  // EU ohne MwST
+  if (in_array($node->field_bill_country[$node->language][0]["value"], $eu_country_array) && $node->field_add_vat[$node->language][0]["value"] == 0) {
+    $new_folder = 'public://' . $path_eu_non_vat . date('m-Y'); 
+    file_prepare_directory($new_folder, FILE_CREATE_DIRECTORY) ? '' : $new_folder = false;
+  }  
+  // EU mit MwST
+  if (in_array($node->field_bill_country[$node->language][0]["value"], $eu_country_array) && $node->field_add_vat[$node->language][0]["value"] == 1) {
+    $new_folder = 'public://' . $path_eu_vat . date('m-Y'); 
+    file_prepare_directory($new_folder, FILE_CREATE_DIRECTORY) ? '' : $new_folder = false;
+  }
+  // nicht EU
+  if (!in_array($node->field_bill_country[$node->language][0]["value"], $eu_country_array)) {
+    $new_folder = 'public://' . $path_non_eu . date('m-Y'); 
+    file_prepare_directory($new_folder, FILE_CREATE_DIRECTORY) ? '' : $new_folder = false;
+  }
+  
+  return $new_folder;
+}
+
+/** 
+ * Implements hook_mail().
+ */ 
+function bricks_bill_crawler_mail($key, &$message, $params) {
+  if (isset($params['subject'])) {
+    $message['subject'] = $params['subject'];
+  }
+  if (isset($params['body'])) {
+    $message['body'][] = $params['body'];
+  }
+  if (isset($params['attachment'])) {
+    $message['params']['attachments'][] = $params['attachment'];
+  }
+}
+
+/** 
+ * send bill .
+ */ 
+function bricks_bill_crawler_mail_send_bill($bill) {
+  
+      $to = 'holger.kramer@hotmail.de'; //gets the current user's mail address
+      $from = variable_get('site_mail', ''); //admin's mail address
+      $body = 'This is a test mail';
+      $subject = 'Testmail';
+      $attachment = array(
+      'filecontent' => file_get_contents($bill->file),
+      'filename' => $bill->filename, // You can change the name and extension of the file you need to send.
+      'filemime' => 'text/plain',  
+      );
+      $message = drupal_mail('bricks_bill_crawler', 'bill_mail', $to, 'und', array('body' => $body, 'subject' => $subject, 'attachment' => $attachment), $from, TRUE);
+      drupal_set_message($message);
+      
 }
 
 function br2nl($string) {
