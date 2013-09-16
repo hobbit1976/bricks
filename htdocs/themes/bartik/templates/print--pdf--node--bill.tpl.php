@@ -4,7 +4,7 @@
   $add_vat = $content['field_add_vat']['und'][0]["value"];
   // PAYCURRENCYCODE
   $payment_code = 'EUR';
-  if (strpos($content['field_grand_total_in_payment']['und'][0]["value"], '$')) {
+  if (isset($content['field_grand_total_in_payment']['und'][0]["value"]) && strpos($content['field_grand_total_in_payment']['und'][0]["value"], '$')) {
     $payment_code = '$';
     $bricks_bill_grand_total_payment_value = str_replace('US&nbsp;$', '', $content['field_grand_total_in_payment']['und'][0]["value"]);
   }
@@ -103,7 +103,7 @@
   $items_count = 0;
   $sum_items = 0.00;
   foreach ($content['field_bill_items_item']['und'] as $key => $value) {
-    $sum_items = $sum_items + ($content['field_bill_items_total_price']['und'][$key]["value"] * ($add_vat == 1 ? 0.81 : 1));
+    $sum_items = $sum_items + ($content['field_bill_items_total_price']['und'][$key]["value"]);
     $items_count++;
     $raw_items .=
       '<div class="bill-items" style="display: table-row; position: relative; width: 100%; font-weight: bold">

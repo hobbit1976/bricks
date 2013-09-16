@@ -135,6 +135,8 @@
     <img style="height: 3.0cm; position: absolute; right: 2.0mm" src="<?php print '/' . drupal_get_path('theme', 'bartik') . '/templates/bricks-logo.jpg'; ?>" />
   </div>
   
+  <div style="position: relative; margin-left: auto; margin-right: auto; width: 300px; font-size: 16px; color: red">Anmerkungen: <?php print $node->field_bill_orderremarks[$node->language][0]["value"]; ?></div>
+  
   <div style="position: relative; display: table; width: 100%">
     <div style="display: table-row; position: relative">
       <div style="width: 11.4cm; display: table-cell; padding-left: 2mm">
@@ -331,7 +333,7 @@
     <div style="position: relative; margin-left: auto; margin-right: auto; width: 100px; font-size: 16px"><?php print l('PDF erzeugen', 'savePDF/' . $node->nid) ?></div>
   <?php endif;?>
   
-  <?php if(0 == 0): ?>
+  <?php if($node->field_bill_check_mail[$node->language][0]["value"] == 0 && $node->field_bill_check_pdf[$node->language][0]["value"] == 1): ?>
     <div style="position: relative; margin-left: auto; margin-right: auto; width: 100px; font-size: 16px"><?php print l('Mail versenden', 'sendMail/' . $node->nid) ?></div>
   <?php endif;?>
   

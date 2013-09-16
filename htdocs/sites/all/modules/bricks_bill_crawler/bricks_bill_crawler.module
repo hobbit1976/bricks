@@ -60,7 +60,7 @@ function bricks_bill_crawler_node_update($node) {
       // Rechnungssprache setzen
       $bill_node->field_bill_language[$node->language][0]["value"] = $language;
       // Rechnungsnummer setzen
-      $bill_node->field_bill_number[$node->language][0]["value"] = date('y') . '/BL' . $node->title;
+      $bill_node->field_bill_number[$node->language][0]["value"] = date('y') . '-BL#' . $node->title;
       // Rechnungsdatum setzen
       $bill_node->field_bill_invoice_date[$node->language][0]["value"] = date('d.m.Y');
       // Lieferdatum setzen
@@ -74,19 +74,28 @@ function bricks_bill_crawler_node_update($node) {
       $bill_node->field_bill_address[$node->language][0]["value"] = $node->field_order_address[$node->language][0]["value"];
       // Herkunftsland setzen
       $bill_node->field_bill_country[$node->language][0]["value"] = $node->field_order_country[$node->language][0]["value"];
+      // E-Mail setzen
+      $bill_node->field_bill_e_mail[$node->language][0]["value"] = $node->field_order_email[$node->language][0]["email"];
+      // Anmerkung setzen
+      $bill_node->field_bill_orderremarks[$node->language][0]["value"] = !empty($node->field_orderremarks[$node->language][0]["value"]) ? $node->field_orderremarks[$node->language][0]["value"] : 'KEINE';
       // PDF-Erzeugung setzen
       $bill_node->field_bill_check_pdf[$node->language][0]["value"] = 0;
+      // Mail versenden
+      $bill_node->field_bill_check_mail[$node->language][0]["value"] = 0;
+      // ohne MwSt.
+      $bill_node->field_add_vat[$node->language][0]["value"] = 0;
       // Order Items setzen
-      $sum_extra_parts = 0;
+      $sum_extra_parts = 0.000;
       $item_numbers = 1;
       $number_standard_items = 0;      
       $number_extra_items = 0;
-      $sum_standard_items = 0.00;
+      $sum_standard_items = 0.000;
       
       foreach ($node->field_orderitemid[$node->language] as $key => $value) {
         // extra items
         if ($node->field_orderitemtype[$node->language][$key]['value'] == 'S' && $node->field_orderitemprice[$node->language][$key]['value'] >= 50) {
           $number_extra_items++;
+          $is_used_or_new = '';
           $bill_node->field_bill_items_item[$node->language][]["value"] = $item_numbers;
           $bill_node->field_bill_items_number[$node->language][]["value"] = $node->field_itemid[$node->language][$key]['value'];
           if ($node->field_itemid[$node->language][$key]['value'] == 'N') {
@@ -105,10 +114,10 @@ function bricks_bill_crawler_node_update($node) {
         // standard items
         else {
           $number_standard_items++;
-          $sum_standard_items = $sum_standard_items + ($node->field_orderitemprice[$node->language][$key]['value'] + $node->field_orderitemqty[$node->language][$key]['value']);
+          $sum_standard_items = $sum_standard_items + ($node->field_orderitemprice[$node->language][$key]['value'] * $node->field_orderitemqty[$node->language][$key]['value']);
         }
       }
-      
+
       // Versand setzen 
       $bill_node->field_shipping_packaging[$node->language][0]["value"] = $node->field_ordershipping[$node->language][0]["value"] + $node->field_orderinsurance[$node->language][0]["value"] + $node->field_orderaddchrg1[$node->language][0]["value"]; 
     
@@ -118,13 +127,15 @@ function bricks_bill_crawler_node_update($node) {
         $bill_node->field_bill_items_number[$node->language][]["value"] = 1;
         $bill_node->field_bill_items_description[$node->language][]["value"] = $language == 'de' ? 'LEGO Einzelteile' : 'LEGO Parts';
         $bill_node->field_bill_items_quantity[$node->language][]["value"] = 1;
-        $bill_node->field_bill_items_unit_price[$node->language][]["value"] = $sum_standard_items + $node->field_orderaddchrg2[$node->language][0]["value"];
-        $bill_node->field_bill_items_total_price[$node->language][]["value"] = $sum_standard_items + $node->field_orderaddchrg2[$node->language][0]["value"];
+        $bill_node->field_bill_items_unit_price[$node->language][]["value"] = $node->field_ordertotal[$node->language][0]["value"] - $sum_extra_parts;
+        $bill_node->field_bill_items_total_price[$node->language][]["value"] = $node->field_ordertotal[$node->language][0]["value"] - $sum_extra_parts;
+        //$bill_node->field_bill_items_unit_price[$node->language][]["value"] = $sum_standard_items + $node->field_orderaddchrg2[$node->language][0]["value"];
+        //$bill_node->field_bill_items_total_price[$node->language][]["value"] = $sum_standard_items + $node->field_orderaddchrg2[$node->language][0]["value"];
         $item_numbers++;        
       }
       
-//      $bill_node->field_sub_total[$node->language][0]["value"] = $node->field_basegrandtotal[$node->language][0]["value"];
-//      $bill_node->field_grand_total[$node->language][0]["value"] = $node->field_basegrandtotal[$node->language][0]["value"];
+      $bill_node->field_sub_total[$node->language][0]["value"] = $node->field_basegrandtotal[$node->language][0]["value"];
+      $bill_node->field_grand_total[$node->language][0]["value"] = $node->field_basegrandtotal[$node->language][0]["value"];
 
       if ($node->field_paycurrencycode[$node->language][0]["value"] != 'EUR') {
         $bill_node->field_grand_total_in_payment[$node->language][0]["value"] = $node->field_order_pay_grand_total[$node->language][0]["value"];
@@ -210,6 +221,12 @@ function bricks_bill_crawler_menu() {
   $items['sendMail'] = array(
     'title' => 'Send PDF as Mail',
     'page callback' => 'bricks_bill_crawler_send_pdf_as_mail',
+    'access arguments' => array('access content overview'),
+  );
+  
+  $items['admin/bill_crawler/startcrawler'] = array(
+    'title' => 'Crawler starten',
+    'page callback' => 'bricks_bill_crawler_start_crawler',
     'access arguments' => array('access content overview'),
   );
   
@@ -358,6 +375,9 @@ function bricks_bill_crawler_start_crawler() {
           }
           $order_node->field_orderitemlabel[$order_node->language][$key]["value"] = $label;
         }
+        else {
+          $order_node->field_orderitemlabel[$order_node->language][$key]["value"] = 'No Label';
+        }
       }
       // save crawler values
       $order_node->field_order_email[$order_node->language][0]['email'] = $crawl_order['email'];
@@ -430,7 +450,7 @@ function bricks_bill_crawler_login_bricklink() {
 /*
  * load order nodes to crawl
  */
-function bricks_bill_crawler_load_order_nodes($limit = 10) {
+function bricks_bill_crawler_load_order_nodes($limit = 20) {
   $order_nodes = array();
   $query = new EntityFieldQuery;
 
@@ -491,11 +511,13 @@ function bricks_bill_crawler_send_pdf_as_mail() {
       // normal nid
       $node = node_load($args[0]);
     }
-      $node->file = str_replace('public://', DRUPAL_ROOT . '/sites/default/files/', bricks_bill_crawler_get_folder_to_save($node) . '/' . str_replace('/', '-', $node->field_bill_number[$node->language][0]["value"]) . '.pdf') ;
-      $node->filename = str_replace('/', '-', $node->field_bill_number[$node->language][0]["value"]) . '.pdf';
+      $node->file = str_replace('public://', DRUPAL_ROOT . '/sites/default/files/', bricks_bill_crawler_get_folder_to_save($node) .  str_replace('#', '-', $node->field_bill_number[$node->language][0]["value"]) . '.pdf') ;
+      $node->filename = $node->field_bill_number[$node->language][0]["value"] . '.pdf';
       bricks_bill_crawler_mail_send_bill($node);
-      drupal_set_message('Mail erfolgreich versendet.');
-      //drupal_goto('node/' . $node->nid);
+      drupal_set_message('Mail erfolgreich versendet an: ' . $node->field_bill_e_mail[$node->language][0]["value"]);
+      $node->field_bill_check_mail[$node->language][0]["value"] = 1;
+      node_save($node);
+      drupal_goto('node/' . $node->nid);
   }
   
   drupal_set_message('Fehler beim Mailversand', 'warning');
@@ -544,7 +566,7 @@ function bricks_bill_crawler_save_pdf() {
     $pdf_filename = 'page';
   }
   $pdf = print_pdf_generate_path($path, $query, $cid);  
-  $filename = bricks_bill_crawler_get_folder_to_save($node) . '/' . str_replace('/', '-', $node->field_bill_number[$node->language][0]["value"]) . '.pdf' ;
+  $filename = bricks_bill_crawler_get_folder_to_save($node) . '/' . str_replace('#', '-', $node->field_bill_number[$node->language][0]["value"]) . '.pdf' ;
   $file = file_save_data($pdf, $filename);
   if ($file !== FALSE) {
     $node->field_bill_check_pdf[$node->language][0]["value"] = 1;
@@ -560,9 +582,9 @@ function bricks_bill_crawler_save_pdf() {
 function bricks_bill_crawler_get_folder_to_save($node) {
     
   $path = 'rechnungen/';
-  $path_eu_vat = $path . 'eu-vat/';
-  $path_eu_non_vat = $path . 'eu-non-vat/';
-  $path_non_eu = $path . 'non-eu/';
+  $path_eu_vat = '/eu-vat/';
+  $path_eu_non_vat = '/eu-non-vat/';
+  $path_non_eu = '/non-eu/';
   $new_folder = false;
   
   $eu_country_array = array(
@@ -598,17 +620,17 @@ function bricks_bill_crawler_get_folder_to_save($node) {
   
   // EU ohne MwST
   if (in_array($node->field_bill_country[$node->language][0]["value"], $eu_country_array) && $node->field_add_vat[$node->language][0]["value"] == 0) {
-    $new_folder = 'public://' . $path_eu_non_vat . date('m-Y'); 
+    $new_folder = 'public://' . $path . date('F-Y') . $path_eu_non_vat; 
     file_prepare_directory($new_folder, FILE_CREATE_DIRECTORY) ? '' : $new_folder = false;
   }  
   // EU mit MwST
   if (in_array($node->field_bill_country[$node->language][0]["value"], $eu_country_array) && $node->field_add_vat[$node->language][0]["value"] == 1) {
-    $new_folder = 'public://' . $path_eu_vat . date('m-Y'); 
+    $new_folder = 'public://' . date('F-Y') . $path_eu_vat; 
     file_prepare_directory($new_folder, FILE_CREATE_DIRECTORY) ? '' : $new_folder = false;
   }
   // nicht EU
   if (!in_array($node->field_bill_country[$node->language][0]["value"], $eu_country_array)) {
-    $new_folder = 'public://' . $path_non_eu . date('m-Y'); 
+    $new_folder = 'public://' . date('F-Y') . $path_non_eu; 
     file_prepare_directory($new_folder, FILE_CREATE_DIRECTORY) ? '' : $new_folder = false;
   }
   
@@ -633,20 +655,85 @@ function bricks_bill_crawler_mail($key, &$message, $params) {
 /** 
  * send bill .
  */ 
-function bricks_bill_crawler_mail_send_bill($bill) {
+function bricks_bill_crawler_mail_send_bill($node) {
+  if ($node->field_bill_language[$node->language][0]["value"] == 'de') {
+    $subject = 'Deine BrickLink-Bestellung ' . $node->title . ' bei 44 Bricks - Versandbenachrichtigung und e-Rechnung';
+    $body = 'Hallo ' .$node->field_bill_salutation[$node->language][0]["value"] . ',
+            <br /><br /> 
+            Deine BrickLink-Bestellung ' . $node->title . ' bei 44 Bricks wurde versendet. 
+            <br /><br />
+            Diese E-Mail enthält Deine bereits bezahlte Rechnung ' .$node->field_bill_number[$node->language][0]["value"] . ' vom ' .$node->field_bill_invoice_date[$node->language][0]["value"] . ' über € ' . number_format($node->field_grand_total[$node->language][0]["value"], 2, ",", ",") . '
+            <br /><br /> 
+            Wenn Du mit Ihrere Bestellung und unserem Service zufrieden warst, würden wir uns sehr über positives Feedback von Dir freuen. Falls Du nicht zufrieden warst, kontaktiere uns bitte, damit wir uns umgehend darum kümmern können.
+            <br /><br />
+            Vielen Dank für Deine Bestellung!
+            <br /><br />
+            <br />
+            Mit freundlichen Grüßen aus Dresden,
+            <br /><br />
+            Dein 44 Bricks Team
+            <br /><br />
+            ---
+            <p style = "color=646D7E">44 Bricks UG (haftungsbeschränkt)
+            <br /><br />
+            Königstr. 17<br />
+            D-01097 Dresden<br />
+            Deutschland<br />
+            <br /><br />
+            Tel: +49(0)351 - 21966427<br />
+            Fax: +49(0)351 - 80806-98<br />
+            E-Mail: <a href="mailto:info@44bricks.com">info@44bricks.com</a><br />
+            Web: <a href="http://www.44bricks.com">www.44bricks.com</a><br />
+            <br /><br />
+            Geschäftsführer: Dennis Becker, Richard Müller<br />
+            HRB 29817 | Amtsgericht Dresden<br />
+            USt-IdNr.: DE276778872<br />
+            Steuer-Nr.: 202/106/08762</p>';
+  }
+  else {
+    $subject = 'Your BrickLink Order ' . $node->title . ' at 44 Bricks - Shipment Notice and e-Invoice';
+    $body = 'Dear ' .$node->field_bill_salutation[$node->language][0]["value"] . ',
+<br /><br /> 
+Your BrickLink Order ' . $node->title . ' at 44 Bricks has been shipped.
+<br /><br />
+This E-Mail contains your settled invoice ' .$node->field_bill_number[$node->language][0]["value"] . ' from ' .$node->field_bill_invoice_date[$node->language][0]["value"] . ' amounting to € ' . number_format($node->field_grand_total[$node->language][0]["value"], 2, ",", ",") . '.
+<br /><br /> 
+If you were satisfied with your order and our service, we would really appreciate to receive positive feedback from you. In case you are not satisfied, please contact us so we can see to it immediately.
+<br /><br />
+Thank you very much for your order!
+<br /><br />
+<br />
+Best Regards from Germany,
+<br /><br />
+Your 44 Bricks Team
+<br /><br />
+---
+<p style = "color=646D7E">44 Bricks UG (haftungsbeschränkt)
+<br /><br />
+Königstr. 17<br />
+D-01097 Dresden<br />
+Germany<br />
+<br /><br />
+Tel: +49(0)351 - 21966427<br />
+Fax: +49(0)351 - 80806-98<br />
+E-Mail: <a href="mailto:info@44bricks.com">info@44bricks.com</a><br />
+Web: <a href="http://www.44bricks.com">www.44bricks.com</a><br />
+<br /><br />
+Managing Directors: Dennis Becker, Richard Müller<br />
+HRB 29817 | Amtsgericht Dresden<br />
+VAT-ID: DE276778872<br />
+Tax-ID: 202/106/08762</p>';
+  }
   
-      $to = 'holger.kramer@hotmail.de'; //gets the current user's mail address
-      $from = variable_get('site_mail', ''); //admin's mail address
-      $body = 'This is a test mail';
-      $subject = 'Testmail';
-      $attachment = array(
-      'filecontent' => file_get_contents($bill->file),
-      'filename' => $bill->filename, // You can change the name and extension of the file you need to send.
-      'filemime' => 'text/plain',  
-      );
-      $message = drupal_mail('bricks_bill_crawler', 'bill_mail', $to, 'und', array('body' => $body, 'subject' => $subject, 'attachment' => $attachment), $from, TRUE);
-      drupal_set_message($message);
-      
+  $to = $node->field_bill_e_mail[$node->language][0]["value"]; //gets the current user's mail address
+  $from = variable_get('site_mail', ''); //admin's mail address
+  $attachment = array(
+    'filecontent' => file_get_contents($node->file),
+    'filename' => $node->filename, // You can change the name and extension of the file you need to send.
+    'filemime' => 'text/plain',  
+  );
+  $message = drupal_mail('bricks_bill_crawler', 'bill_mail', $to, 'und', array('body' => $body, 'subject' => $subject, 'attachment' => $attachment), $from, TRUE);
+       
 }
 
 function br2nl($string) {
