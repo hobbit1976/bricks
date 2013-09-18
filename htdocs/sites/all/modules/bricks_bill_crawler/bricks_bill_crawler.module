@@ -205,12 +205,12 @@ function bricks_bill_crawler_menu() {
 //    'page arguments' => array('bricks_bill_crawler_xml_upload_form'),
 //    'access arguments' => array('access content overview'),
 //  );
-  $items['admin/bill_crawler'] = array(
-    'title' => 'Bricks bill crawler',
-    'page callback' => 'bricks_bill_crawler_start_crawler_test',
-    'access arguments' => array('access content overview'),
-    'type' => MENU_CALLBACK,
-  );
+  // $items['admin/bill_crawler'] = array(
+    // 'title' => 'Bricks bill crawler',
+    // 'page callback' => 'bricks_bill_crawler_start_crawler_test',
+    // 'access arguments' => array('access content overview'),
+    // 'type' => MENU_CALLBACK,
+  // );
   
   $items['savePDF'] = array(
     'title' => 'Save node as PDF',
@@ -224,11 +224,11 @@ function bricks_bill_crawler_menu() {
     'access arguments' => array('access content overview'),
   );
   
-  $items['admin/bill_crawler/startcrawler'] = array(
-    'title' => 'Crawler starten',
-    'page callback' => 'bricks_bill_crawler_start_crawler',
-    'access arguments' => array('access content overview'),
-  );
+//  $items['admin/bill_crawler/startcrawler'] = array(
+//    'title' => 'Crawler starten',
+//    'page callback' => 'bricks_bill_crawler_start_crawler',
+//    'access arguments' => array('access content overview'),
+//  );
   
   return $items;
 }
@@ -450,7 +450,7 @@ function bricks_bill_crawler_login_bricklink() {
 /*
  * load order nodes to crawl
  */
-function bricks_bill_crawler_load_order_nodes($limit = 20) {
+function bricks_bill_crawler_load_order_nodes($limit = 30) {
   $order_nodes = array();
   $query = new EntityFieldQuery;
 
@@ -620,17 +620,17 @@ function bricks_bill_crawler_get_folder_to_save($node) {
   
   // EU ohne MwST
   if (in_array($node->field_bill_country[$node->language][0]["value"], $eu_country_array) && $node->field_add_vat[$node->language][0]["value"] == 0) {
-    $new_folder = 'public://' . $path . date('F-Y') . $path_eu_non_vat; 
+    $new_folder = 'public://' . $path . date('F-Y', strtotime($node->field_bill_invoice_date['und']['0']['value'])) . $path_eu_non_vat; 
     file_prepare_directory($new_folder, FILE_CREATE_DIRECTORY) ? '' : $new_folder = false;
   }  
   // EU mit MwST
   if (in_array($node->field_bill_country[$node->language][0]["value"], $eu_country_array) && $node->field_add_vat[$node->language][0]["value"] == 1) {
-    $new_folder = 'public://' . date('F-Y') . $path_eu_vat; 
+    $new_folder = 'public://' . $path . date('F-Y', strtotime($node->field_bill_invoice_date['und']['0']['value'])) . $path_eu_vat; 
     file_prepare_directory($new_folder, FILE_CREATE_DIRECTORY) ? '' : $new_folder = false;
   }
   // nicht EU
   if (!in_array($node->field_bill_country[$node->language][0]["value"], $eu_country_array)) {
-    $new_folder = 'public://' . date('F-Y') . $path_non_eu; 
+    $new_folder = 'public://' . $path . date('F-Y', strtotime($node->field_bill_invoice_date['und']['0']['value'])) . $path_non_eu; 
     file_prepare_directory($new_folder, FILE_CREATE_DIRECTORY) ? '' : $new_folder = false;
   }
   

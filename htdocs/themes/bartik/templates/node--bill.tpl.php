@@ -105,7 +105,7 @@
     $sum_items = $sum_items + $content['field_bill_items_total_price']['#items'][$key]["value"];
     $items_count++;
     $raw_items .=
-      '<div class="bill-items" style="display: table-row; position: relative; width: 100%; font-weight: bold">
+      '<div class="bill-items" style="display: table-row; position: relative; width: 100%">
         <div style="width: 1.0cm; display: table-cell; padding-left: 2mm; padding-right: 2mm">
           ' . $content['field_bill_items_item']['#items'][$key]["value"] . '
         </div>
@@ -180,7 +180,7 @@
   
   
   <div style="position: relative; display: table; font-size: 8px; border-collapse: collapse; margin-left: auto; margin-right: auto">
-    <div style="border-bottom: 0.2mm solid grey; display: table-row; position: relative; width: 100%; font-weight: bold">
+    <div style="border-bottom: 0.2mm solid grey; display: table-row; position: relative; width: 100%">
       <div style="width: 1.0cm; display: table-cell; padding-left: 2mm; padding-right: 2mm">
         <?php print $bricks_bill_table_header_item; ?>
       </div>
@@ -224,7 +224,7 @@
       </div>
     </div>    
 -->    
-    <div class="bill-items" style="display: table-row; position: relative; width: 100%; font-weight: bold; border-top: 0.2mm solid grey">
+    <div class="bill-items" style="display: table-row; position: relative; width: 100%; border-top: 0.2mm solid grey">
       <div style="width: 1.0cm; display: table-cell; padding-left: 2mm; padding-right: 2mm">
         <?php print ' '; ?>
       </div>
@@ -246,7 +246,7 @@
     </div> 
     
     <?php if ($add_vat == 1): ?>
-    <div class="bill-items" style="display: table-row; position: relative; width: 100%; font-weight: bold">
+    <div class="bill-items" style="display: table-row; position: relative; width: 100%>
       <div style="width: 1.0cm; display: table-cell; padding-left: 2mm; padding-right: 2mm">
         <?php print ' '; ?>
       </div>
@@ -268,7 +268,7 @@
     </div>
     <?php endif; ?>
     
-    <div class="bill-items" style="display: table-row; position: relative; width: 100%; font-weight: bold">
+    <div class="bill-items" style="display: table-row; position: relative; width: 100%">
       <div style="width: 1.0cm; display: table-cell; padding-left: 2mm; padding-right: 2mm">
         <?php print ' '; ?>
       </div>
@@ -282,15 +282,19 @@
         <?php print ' '; ?>
       </div>
       <div style="width: 2.25cm; display: table-cell; padding-left: 2mm; padding-right: 2mm; text-align: right">
+        <?php if ($payment_code != '$'): ?><b><?php endif; ?>
         <?php print $bricks_bill_grand_total;?>
+        <?php if ($payment_code != '$'): ?></b><?php endif; ?>
       </div>
       <div style="width: 2.25cm; display: table-cell; text-align: right; padding-left: 2mm; padding-right: 2mm">
+        <?php if ($payment_code != '$'): ?><b><?php endif; ?>
         <?php print number_format($sum_items, 2, ',', '.'); ?> €
+        <?php if ($payment_code != '$'): ?></b><?php endif; ?>
       </div>
     </div>
     
     <?php if ($payment_code == '$'): ?>
-    <div class="bill-items" style="display: table-row; position: relative; width: 100%; font-weight: bold">
+    <div class="bill-items" style="display: table-row; position: relative; width: 100%">
       <div style="width: 1.0cm; display: table-cell; padding-left: 2mm; padding-right: 2mm">
         <?php print ' '; ?>
       </div>
@@ -304,10 +308,10 @@
         <?php print ' '; ?>
       </div>
       <div style="width: 3.25cm; display: table-cell; padding-left: 2mm; padding-right: 2mm; text-align: right">
-        <?php print $bricks_bill_grand_total_payment;?>
+        <b><?php print $bricks_bill_grand_total_payment;?></b>
       </div>
       <div style="width: 2.25cm; display: table-cell; text-align: right; padding-left: 2mm; padding-right: 2mm">
-        <?php print number_format($bricks_bill_grand_total_payment_value, 2, ',', '.'); ?> $
+        <b><?php print number_format($bricks_bill_grand_total_payment_value, 2, ',', '.'); ?> $</b>
       </div>
     </div>
     <?php endif; ?>

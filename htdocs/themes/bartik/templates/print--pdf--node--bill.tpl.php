@@ -106,7 +106,7 @@
     $sum_items = $sum_items + ($content['field_bill_items_total_price']['und'][$key]["value"]);
     $items_count++;
     $raw_items .=
-      '<div class="bill-items" style="display: table-row; position: relative; width: 100%; font-weight: bold">
+      '<div class="bill-items" style="display: table-row; position: relative; width: 100%">
         <div style="width: 0.75cm; display: table-cell; padding-left: 2mm; padding-right: 2mm">
           ' . $content['field_bill_items_item']['und'][$key]["value"] . '
         </div>
@@ -193,7 +193,7 @@
   <br />
   
   <div style="position: relative; display: table; font-size: 8px; border-collapse: collapse; margin-left: auto; margin-right: auto">
-    <div style="display: table-row; position: relative; font-weight: bold">
+    <div style="display: table-row; position: relative">
       <div style="border-bottom: 0.2mm solid grey; width: 0.75cm; display: table-cell; padding-left: 2mm; padding-right: 2mm">
         <?php print $bricks_bill_table_header_item; ?>
       </div>
@@ -237,7 +237,7 @@
       </div>
     </div>    
 -->    
-    <div class="bill-items" style="display: table-row; position: relative; width: 100%; font-weight: bold">
+    <div class="bill-items" style="display: table-row; position: relative; width: 100%">
       <div style="border-top: 0.2mm solid grey; width: 0.75cm; display: table-cell; padding-left: 2mm; padding-right: 2mm">
         <?php print ' '; ?>
       </div>
@@ -259,7 +259,7 @@
     </div> 
     
     <?php if ($add_vat == 1): ?>
-    <div class="bill-items" style="display: table-row; position: relative; width: 100%; font-weight: bold">
+    <div class="bill-items" style="display: table-row; position: relative; width: 100%">
       <div style="width: 0.75cm; display: table-cell; padding-left: 2mm; padding-right: 2mm">
         <?php print ' '; ?>
       </div>
@@ -281,7 +281,7 @@
     </div>
     <?php endif; ?>
     
-    <div class="bill-items" style="display: table-row; position: relative; width: 100%; font-weight: bold">
+    <div class="bill-items" style="display: table-row; position: relative; width: 100%">
       <div style="width: 0.75cm; display: table-cell; padding-left: 2mm; padding-right: 2mm">
         <?php print ' '; ?>
       </div>
@@ -294,16 +294,20 @@
       <div style="width: 1.5cm; display: table-cell; padding-left: 2mm; padding-right: 2mm">
         <?php print ' '; ?>
       </div>
-      <div style="width: 2.25cm; display: table-cell; padding-left: 2mm; padding-right: 2mm; text-align: right">
+      <div style="width: 2.25cm; display: table-cell; padding-left: 2mm; padding-right: 1.5mm; text-align: right">
+        <?php if ($payment_code != '$'): ?><b><?php endif; ?>
         <?php print $bricks_bill_grand_total;?>
+        <?php if ($payment_code != '$'): ?></b><?php endif; ?>
       </div>
-      <div style="width: 2.25cm; display: table-cell; text-align: right; padding-left: 2mm; padding-right: 2mm">
+      <div style="width: 2.25cm; display: table-cell; text-align: right; padding-left: 2mm; padding-right: 1.5mm">
+        <?php if ($payment_code != '$'): ?><b><?php endif; ?>
         <?php print number_format($sum_items, 2, ',', '.'); ?> €
+        <?php if ($payment_code != '$'): ?></b><?php endif; ?>
       </div>
     </div>
     
     <?php if ($payment_code == '$'): ?>
-    <div class="bill-items" style="display: table-row; position: relative; width: 100%; font-weight: bold">
+    <div class="bill-items" style="display: table-row; position: relative; width: 100%">
       <div style="width: 0.75cm; display: table-cell; padding-left: 2mm; padding-right: 2mm">
         <?php print ' '; ?>
       </div>
@@ -316,11 +320,11 @@
       <div style="width: 0.25cm; display: table-cell; padding-left: 2mm; padding-right: 2mm">
         <?php print ' '; ?>
       </div>
-      <div style="width: 3.5cm; display: table-cell; padding-left: 2mm; padding-right: 2mm; text-align: right">
-        <?php print $bricks_bill_grand_total_payment;?>
+      <div style="width: 3.5cm; display: table-cell; padding-left: 2mm; padding-right: 1.5mm; text-align: right">
+        <b><?php print $bricks_bill_grand_total_payment;?></b>
       </div>
-      <div style="width: 2.25cm; display: table-cell; text-align: right; padding-left: 2mm; padding-right: 2mm">
-        <?php print number_format($bricks_bill_grand_total_payment_value, 2, ',', '.'); ?> $
+      <div style="width: 2.25cm; display: table-cell; text-align: right; padding-left: 2mm; padding-right: 1.5mm">
+        <b><?php print number_format($bricks_bill_grand_total_payment_value, 2, ',', '.'); ?> $</b>
       </div>
     </div>
     <?php endif; ?>
