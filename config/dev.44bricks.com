@@ -6,11 +6,11 @@
 
   # suggestion for single-user dev systems:
   # create a symlink to your actual directory in the workspace
-  DocumentRoot /home/hkramer/dennis/bricks/htdocs
+  DocumentRoot /var/www/bricks/htdocs
 
   php_value include_path .:/usr/share/php:/usr/share/pear
 
-  <Directory /home/hkramer/dennis/bricks/htdocs>
+  <Directory /var/www/bricks/htdocs>
    Options FollowSymlinks
    AllowOverride All
    Order allow,deny
