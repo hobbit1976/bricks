@@ -77,8 +77,12 @@ function bartik_process_page(&$variables) {
  * Implements hook_preprocess_maintenance_page().
  */
 function bartik_preprocess_maintenance_page(&$variables) {
+  // By default, site_name is set to Drupal if no db connection is available
+  // or during site installation. Setting site_name to an empty string makes
+  // the site and update pages look cleaner.
+  // @see template_preprocess_maintenance_page
   if (!$variables['db_is_active']) {
-    unset($variables['site_name']);
+    $variables['site_name'] = '';
   }
   drupal_add_css(drupal_get_path('theme', 'bartik') . '/css/maintenance-page.css');
 }
@@ -108,6 +112,7 @@ function bartik_preprocess_node(&$variables) {
   if ($variables['view_mode'] == 'full' && node_is_page($variables['node'])) {
     $variables['classes_array'][] = 'node-full';
   }
+  $variables['template_files'][] = 'node--'. str_replace('_', '-', $variables['node']->type);
 }
 
 /**
@@ -138,6 +143,7 @@ function bartik_field__taxonomy_term_reference($variables) {
     $output .= '<h3 class="field-label">' . $variables['label'] . ': </h3>';
   }
 
+  // Treat all user pages as administrative.
   // Render the items.
   $output .= ($variables['element']['#label_display'] == 'inline') ? '<ul class="links inline">' : '<ul class="links">';
   foreach ($variables['items'] as $delta => $item) {
@@ -146,7 +152,14 @@ function bartik_field__taxonomy_term_reference($variables) {
   $output .= '</ul>';
 
   // Render the top-level DIV.
-  $output = '<div class="' . $variables['classes'] . (!in_array('clearfix', $variables['classes_array']) ? ' clearfix' : '') . '">' . $output . '</div>';
+  $output = '<div class="' . $variables['classes'] . (!in_array('clearfix', $variables['classes_array']) ? ' clearfix' : '') . '"' . $variables['attributes'] .'>' . $output . '</div>';
 
   return $output;
+}
+
+function bartik_preprocess_page(&$vars, $hook) {
+  if (isset($vars['node'])) {
+    // If the node type is "blog" the template suggestion will be "page--blog.tpl.php".
+    //$vars['theme_hook_suggestions'][] = 'page__'. str_replace('_', '--', $vars['node']->type);
+  }
 }

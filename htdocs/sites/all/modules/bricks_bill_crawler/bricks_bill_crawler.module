@@ -1,5 +1,211 @@
 <?php
 
+function bricks_bill_crawler_admin_paths_alter(&$paths) {
+ // $paths['node/*/edit'] = TRUE;
+}
+
+/** 
+ * Implements hook_theme().
+ */ 
+function bricks_bill_crawler_theme($existing, $type, $theme, $path) {
+    
+  return array(
+    'bill_node_form' => array(
+      'render element' => 'form',
+      'template' => 'bill-node-form',
+      'path' => drupal_get_path('module', 'bricks_bill_crawler'),
+    ),
+  );
+}
+
+/** 
+ * Preprocessor for theme('bill_node_form').
+ */
+function template_preprocess_bill_node_form(&$variables) {
+  
+}
+
+/* 
+ * Implements hook_node_update().
+ */
+function bricks_bill_crawler_node_presave($node) {
+  if ($node->type == 'bill') {
+    foreach ($node->field_bill_items_unit_price[$node->language] as $key => $value) {
+      $node->field_bill_items_total_price[$node->language][$key]['value'] = (string) ($node->field_bill_items_quantity[$node->language][$key]['value'] * $node->field_bill_items_unit_price[$node->language][$key]['value']);
+    }
+  }
+}
+
+/* 
+ * Implements hook_node_update().
+ */
+function bricks_bill_crawler_node_update($node) {
+  // wenn Order crawled, dann Rechnung erstellen
+  if ($node->type == 'orders' && $node->field_order_crawled[$node->language][0]["value"] == 1) {
+    // prüfen auf vorhandene Rechnung
+    $order_bill = bricks_bill_crawler_load_bill_nodes($node->title);
+    if (!empty($order_bill)) {
+      drupal_set_message('Rechnung vorhanden');      
+    }
+    else {
+      // Rechnungssprache festlegen
+      $language = 'en';
+      if ($node->field_order_country[$node->language][0]["value"] == 'Germany' || $node->field_order_country[$node->language][0]["value"] == 'Austria') {
+        $language = 'de';
+      }
+      // Objekt anlegen
+      $bill_node = new stdClass();
+      // Typ festlegen
+      $bill_node->type = 'bill';
+      // default Werte setzen
+      node_object_prepare($bill_node);
+      // UID auf Admin setzen
+      $bill_node->uid = 1;
+      // nicht voröffentlichen
+      $bill_node->status = 0;
+      $bill_node->promote = 0;
+      // Sprache auf neutral setzen
+      $bill_node->language = LANGUAGE_NONE;
+      // OrderID als Titel setzen
+      $bill_node->title = $node->title;
+      // Rechnungssprache setzen
+      $bill_node->field_bill_language[$node->language][0]["value"] = $language;
+      // Rechnungsnummer setzen
+      $bill_node->field_bill_number[$node->language][0]["value"] = date('y') . '-BL#' . $node->title;
+      // Rechnungsdatum setzen
+      $bill_node->field_bill_invoice_date[$node->language][0]["value"] = date('d.m.Y');
+      // Lieferdatum setzen
+      $bill_node->field_bill_delivery_date[$node->language][0]["value"] = date('d.m.Y');
+      // Zahlungsziel setzen
+      $bill_node->field_bill_term_of_payment[$node->language][0]["value"] = $language == 'de' ? 'sofort fällig' : 'immediately due and payable';
+      // Anrede setzen
+      $address_array = explode('<BR>', $node->field_order_address[$node->language][0]["value"]);
+      $bill_node->field_bill_salutation[$node->language][0]["value"] = $address_array[0];
+      // Adresse setzen
+      $bill_node->field_bill_address[$node->language][0]["value"] = $node->field_order_address[$node->language][0]["value"];
+      // Herkunftsland setzen
+      $bill_node->field_bill_country[$node->language][0]["value"] = $node->field_order_country[$node->language][0]["value"];
+      // E-Mail setzen
+      $bill_node->field_bill_e_mail[$node->language][0]["value"] = $node->field_order_email[$node->language][0]["email"];
+      // Anmerkung setzen
+      $bill_node->field_bill_orderremarks[$node->language][0]["value"] = !empty($node->field_orderremarks[$node->language][0]["value"]) ? $node->field_orderremarks[$node->language][0]["value"] : 'KEINE';
+      // PDF-Erzeugung setzen
+      $bill_node->field_bill_check_pdf[$node->language][0]["value"] = 0;
+      // Mail versenden
+      $bill_node->field_bill_check_mail[$node->language][0]["value"] = 0;
+      // ohne MwSt.
+      $bill_node->field_add_vat[$node->language][0]["value"] = 0;
+      // Order Items setzen
+      $sum_extra_parts = 0.000;
+      $item_numbers = 1;
+      $number_standard_items = 0;      
+      $number_extra_items = 0;
+      $sum_standard_items = 0.000;
+      
+      foreach ($node->field_orderitemid[$node->language] as $key => $value) {
+        // extra items
+        if ($node->field_orderitemtype[$node->language][$key]['value'] == 'S' && $node->field_orderitemprice[$node->language][$key]['value'] >= 50) {
+          $number_extra_items++;
+          $is_used_or_new = '';
+          $bill_node->field_bill_items_item[$node->language][]["value"] = $item_numbers;
+          $bill_node->field_bill_items_number[$node->language][]["value"] = $node->field_itemid[$node->language][$key]['value'];
+          if ($node->field_itemid[$node->language][$key]['value'] == 'N') {
+            $is_used_or_new .= $language == 'de' ? '(Neu)' : '(New)';
+          }
+          else {
+            $is_used_or_new .= $language == 'de' ? '(Gebraucht)' : '(Used)';
+          }
+          $bill_node->field_bill_items_description[$node->language][]["value"] = 'LEGO ' . $node->field_itemid[$node->language][$key]['value'] . ' - ' . $node->field_orderitemlabel[$node->language][$key]['value'] . "<br />" . $is_used_or_new;
+          $bill_node->field_bill_items_quantity[$node->language][]["value"] = $node->field_orderitemqty[$node->language][$key]['value'];
+          $bill_node->field_bill_items_unit_price[$node->language][]["value"] = $node->field_orderitemprice[$node->language][$key]['value'];
+          $bill_node->field_bill_items_total_price[$node->language][]["value"] = $node->field_orderitemqty[$node->language][$key]['value'] * $node->field_orderitemprice[$node->language][$key]['value'];
+          $sum_extra_parts = ($node->field_orderitemqty[$node->language][$key]['value'] * $node->field_orderitemprice[$node->language][$key]['value']) + $sum_extra_parts;
+          $item_numbers++;
+        }
+        // standard items
+        else {
+          $number_standard_items++;
+          $sum_standard_items = $sum_standard_items + ($node->field_orderitemprice[$node->language][$key]['value'] * $node->field_orderitemqty[$node->language][$key]['value']);
+        }
+      }
+
+      // Versand setzen 
+      $bill_node->field_shipping_packaging[$node->language][0]["value"] = $node->field_ordershipping[$node->language][0]["value"] + $node->field_orderinsurance[$node->language][0]["value"] + $node->field_orderaddchrg1[$node->language][0]["value"]; 
+    
+      // standard item setzen
+      if ($number_standard_items > 0 || $node->field_orderaddchrg2[$node->language][0]["value"] > 0) {             
+        $bill_node->field_bill_items_item[$node->language][]["value"] = $item_numbers;
+        $bill_node->field_bill_items_number[$node->language][]["value"] = 1;
+        $bill_node->field_bill_items_description[$node->language][]["value"] = $language == 'de' ? 'LEGO Einzelteile' : 'LEGO Parts';
+        $bill_node->field_bill_items_quantity[$node->language][]["value"] = 1;
+        $bill_node->field_bill_items_unit_price[$node->language][]["value"] = $node->field_ordertotal[$node->language][0]["value"] - $sum_extra_parts;
+        $bill_node->field_bill_items_total_price[$node->language][]["value"] = $node->field_ordertotal[$node->language][0]["value"] - $sum_extra_parts;
+        //$bill_node->field_bill_items_unit_price[$node->language][]["value"] = $sum_standard_items + $node->field_orderaddchrg2[$node->language][0]["value"];
+        //$bill_node->field_bill_items_total_price[$node->language][]["value"] = $sum_standard_items + $node->field_orderaddchrg2[$node->language][0]["value"];
+        $item_numbers++;        
+      }
+      
+      $bill_node->field_sub_total[$node->language][0]["value"] = $node->field_basegrandtotal[$node->language][0]["value"];
+      $bill_node->field_grand_total[$node->language][0]["value"] = $node->field_basegrandtotal[$node->language][0]["value"];
+
+      if ($node->field_paycurrencycode[$node->language][0]["value"] != 'EUR') {
+        $bill_node->field_grand_total_in_payment[$node->language][0]["value"] = $node->field_order_pay_grand_total[$node->language][0]["value"];
+      }
+      
+      
+      // Versand setzen 
+      // $bill_node->field_shipping_packaging[$node->language][0]["value"] = $node->field_ordershipping[$node->language][0]["value"] + $node->field_orderinsurance[$node->language][0]["value"] + $node->field_orderaddchrg1[$node->language][0]["value"]; 
+    
+      if ($node->field_ordershipping[$node->language][0]["value"] > 0 || $node->field_orderinsurance[$node->language][0]["value"] > 0 || $node->field_orderaddchrg1[$node->language][0]["value"] > 0) {             
+        $bill_node->field_bill_items_item[$node->language][]["value"] = $item_numbers;
+        $bill_node->field_bill_items_number[$node->language][]["value"] = $language == 'de' ? 'V' : 'S';
+        $bill_node->field_bill_items_description[$node->language][]["value"] = $language == 'de' ? 'Verpackung & Versand' : 'Shipping & Packaging';
+        $bill_node->field_bill_items_quantity[$node->language][]["value"] = 1;
+        $bill_node->field_bill_items_unit_price[$node->language][]["value"] = $node->field_ordershipping[$node->language][0]["value"] + $node->field_orderinsurance[$node->language][0]["value"] + $node->field_orderaddchrg1[$node->language][0]["value"];
+        $bill_node->field_bill_items_total_price[$node->language][]["value"] = $node->field_ordershipping[$node->language][0]["value"] + $node->field_orderinsurance[$node->language][0]["value"] + $node->field_orderaddchrg1[$node->language][0]["value"];
+        $item_numbers++;        
+      }
+      
+      // Rabatt setzen
+      if ($node->field_ordercredit[$node->language][0]["value"] > 0 || $node->field_ordercreditcoupon[$node->language][0]["value"] > 0) {           
+        $bill_node->field_bill_items_item[$node->language][]["value"] = $item_numbers;
+        $bill_node->field_bill_items_number[$node->language][]["value"] = $language == 'de' ? 'R' : 'C';
+        $bill_node->field_bill_items_description[$node->language][]["value"] = $language == 'de' ? 'Rabatt' : 'Credit';
+        $bill_node->field_bill_items_quantity[$node->language][]["value"] = 1;
+        $bill_node->field_bill_items_unit_price[$node->language][]["value"] = -1 * ($node->field_ordercredit[$node->language][0]["value"] + $node->field_ordercreditcoupon[$node->language][0]["value"]);
+        $bill_node->field_bill_items_total_price[$node->language][]["value"] = -1 * ($node->field_ordercredit[$node->language][0]["value"] + $node->field_ordercreditcoupon[$node->language][0]["value"]);
+        
+      }
+      
+      
+      // Zahlungstyp setzen
+      switch ($node->field_paymenttype[$node->language][0]["value"]) {
+        case 'PayPal.com':
+          $bill_node->field_bill_paymenttype[$node->language][0]["value"] = $language == 'de' ? 'PayPal' : 'PayPal';
+          break;
+          
+        case 'IBAN':
+          $bill_node->field_bill_paymenttype[$node->language][0]["value"] = $language == 'de' ? 'Überweisung' : 'bank transfer';          
+          break;        
+          
+        case 'Bank Transfer':
+          $bill_node->field_bill_paymenttype[$node->language][0]["value"] = $language == 'de' ? 'Überweisung' : 'bank transfer';          
+          break;
+        
+        
+        default:
+          
+          break;
+      }
+      
+      // Node speichern
+      if ($bill_node = node_submit($bill_node)) {
+        node_save($bill_node);      
+      }
+    }
+  }
+}
+
 /* 
  * Implements hook_menu().
  */
@@ -10,18 +216,32 @@ function bricks_bill_crawler_menu() {
 //    'page arguments' => array('bricks_bill_crawler_xml_upload_form'),
 //    'access arguments' => array('access content overview'),
 //  );
-  $items['admin/bill_crawler'] = array(
-    'title' => 'Bricks bill crawler',
-    'page callback' => 'bricks_bill_crawler_start_crawler',
+  // $items['admin/bill_crawler'] = array(
+    // 'title' => 'Bricks bill crawler',
+    // 'page callback' => 'bricks_bill_crawler_start_crawler_test',
+    // 'access arguments' => array('access content overview'),
+    // 'type' => MENU_CALLBACK,
+  // );
+  
+  $items['savePDF'] = array(
+    'title' => 'Save node as PDF',
+    'page callback' => 'bricks_bill_crawler_save_pdf',
     'access arguments' => array('access content overview'),
   );
   
+  $items['sendMail'] = array(
+    'title' => 'Send PDF as Mail',
+    'page callback' => 'bricks_bill_crawler_send_pdf_as_mail',
+    'access arguments' => array('access content overview'),
+  );
+  
+//  $items['admin/bill_crawler/startcrawler'] = array(
+//    'title' => 'Crawler starten',
+//    'page callback' => 'bricks_bill_crawler_start_crawler',
+//    'access arguments' => array('access content overview'),
+//  );
   
   return $items;
-}
-
-function bricks_bill_crawler_xml_upload_form($form, &$form_state) {
-	
 }
 
 /*
@@ -32,36 +252,165 @@ function bricks_bill_crawler_get_order($login_session, $order_id) {
   curl_setopt($login_session, CURLOPT_URL, $order_url);
   $order_data = curl_exec($login_session);
   
-  return $order_data;
+  if (strpos($order_data, 'Object Moved')) {
+    return false;
+  }
+  else {
+    return $order_data;
+  }
 }
 
 /*
- * save order
+ * get one item from website
+ */
+function bricks_bill_crawler_get_item($login_session, $item_id) {
+  $item_url = 'http://www.bricklink.com/catalogItem.asp?S=' . $item_id;
+  curl_setopt($login_session, CURLOPT_URL, $item_url);
+  $item_data = curl_exec($login_session);
+  
+  if (strpos($item_data, 'No Item(s) were found. Please try again!')) {
+    return false;
+  }
+  else {
+    return $item_data;
+  }
+}
+
+/*
+ * crawl order
  */ 
-function bricks_bill_crawler_login_save_buyer($order) {
+function bricks_bill_crawler_order_crawl($order) {
+  include_once('simple_html_dom.php');
   $buyer = array();
+//  $html = str_get_html($order);
+//  foreach($html->find('table', 0)->find('font', 1)->find('table', 0)->find('tr', 0)->find('table', 1)->find('tr', 6)->find('b') as $element) {
+//   $buyer['pay_grand'] = strip_tags((string) $element);
+//  }
+  $start_pos_pay_grand = stripos($order, 'Pay&nbsp;Grand&nbsp;Total:');
+  if ($start_pos_pay_grand !== FALSE) {
+    $grand_total_block = substr($order, $start_pos_pay_grand, 100);
+    $start_pos_pay_grand = stripos($grand_total_block, '<B>') + 3;
+    $end_pos_pay_grand = stripos($grand_total_block, '</B>');
+    $buyer['pay_grand'] = substr($grand_total_block, $start_pos_pay_grand, $end_pos_pay_grand-$start_pos_pay_grand);
+  }
+  else {
+    $buyer['pay_grand'] = '';
+  }
   $start_pos_buyer_block = stripos($order, '<b>Buyer Information</b>');
   $end_pos_buyer_block = stripos($order, '<b>Seller Information</b>');
   $buyer_block = substr($order, $start_pos_buyer_block, ($end_pos_buyer_block-$start_pos_buyer_block));
   preg_match('/HREF="mailto:(.*)">/isU', $buyer_block, $email_match);
-  $buyer['emai'] = $email_match[1];
+  $buyer['email'] = $email_match[1];
   preg_match('/Name & Address:<\/TD><TD WIDTH="75%">(.*)<\/TD>/isU', $buyer_block, $address_match);
   $buyer['address'] = $address_match[1];
   $country_pos = strripos($buyer['address'], '<BR>');  
   $buyer['country'] = substr($buyer['address'], ($country_pos + 4));
-  preg_match('/<td>Grand Total:(.*)/isU', $order, $total_grand);
-  var_dump($total_grand);
+  //preg_match('/<td>Grand Total:(.*)/isU', $order, $total_grand);
+  
+  
+  if (!empty($buyer['email']) && !empty($buyer['address']) && !empty($buyer['country'])) {
+    return $buyer;
+  }
+  else {    
+    return false;
+  }  
 }
- 
+/*
+ * crawl item
+ */ 
+function bricks_bill_crawler_item_crawl($item) {
+  include_once('simple_html_dom.php');
+  $label = '';
+  $html = str_get_html($item);
+  foreach($html->find('table center font[face="Geneva,Arial,Helvetica"] b') as $element) {
+    $label = $element;
+  }
+  if ($label != '') {
+    return $label;
+  }
+  else {    
+    return false;
+  }  
+}
+
+/*
+ * start crawler test
+ */
+function bricks_bill_crawler_start_crawler_test() {
+  $node = new stdClass();
+  $node->field_bill_country['und'][0]["value"] = 'Germany';
+  $node->field_add_vat['und'][0]["value"] = 1;
+  $node->language = 'und';
+  $path = bricks_bill_crawler_get_folder_to_save($node);var_dump($path);
+} 
+
 /*
  * start crawler
  */
-function bricks_bill_crawler_start_crawler() {var_dump('start');
+function bricks_bill_crawler_start_crawler() {
+  // login
   $login_session = bricks_bill_crawler_login_bricklink();
-  $order = bricks_bill_crawler_get_order($login_session, 3689147);
-  bricks_bill_crawler_login_save_buyer($order);
   
+  if ($login_session != false) {
+    // load open order nodes
+    $order_nodes = bricks_bill_crawler_load_order_nodes();
+    foreach ($order_nodes as $order_node) {
+      // node load
+      $order_node = node_load($order_node->nid);
+      // read order page
+      $order = bricks_bill_crawler_get_order($login_session, $order_node->title);
+      if ($order == false) {
+        watchdog('Bricks bill crawler', 'No Order data by NID: %nid', array('%nid' => $order_node->nid), WATCHDOG_ERROR);
+        continue;
+      }
+      // crawl order
+      $crawl_order = bricks_bill_crawler_order_crawl($order);
+      if ($crawl_order == false) {
+        watchdog('Bricks bill crawler', 'Crawler with no result by NID: %nid', array('%nid' => $order_node->nid), WATCHDOG_ERROR);
+        continue;
+      }
+      // crawl item label    
+      foreach ($order_node->field_orderitemid[$order_node->language] as $key => $value) {
+        if ($order_node->field_orderitemprice[$order_node->language][$key]["value"] >= 50 && $order_node->field_orderitemtype[$order_node->language][$key]["value"] == 'S') {
+          // read item page
+          $item = bricks_bill_crawler_get_item($login_session, $order_node->field_itemid[$order_node->language][$key]["value"]);
+          if ($item == false) {
+            watchdog('Bricks bill crawler', 'No Item data by NID: %nid', array('%nid' => $order_node->nid), WATCHDOG_ERROR);
+            continue;
+          }
+          // crawl item
+          $label = bricks_bill_crawler_item_crawl($item);
+          if ($label == false) {
+            watchdog('Bricks bill crawler', 'No Item label by NID: %nid', array('%nid' => $order_node->nid), WATCHDOG_ERROR);
+            continue;
+          }
+          $order_node->field_orderitemlabel[$order_node->language][$key]["value"] = $label;
+        }
+        else {
+          $order_node->field_orderitemlabel[$order_node->language][$key]["value"] = 'No Label';
+        }
+      }
+      // save crawler values
+      $order_node->field_order_email[$order_node->language][0]['email'] = $crawl_order['email'];
+      $order_node->field_order_address[$order_node->language][0]['value'] = $crawl_order['address'];
+      $order_node->field_order_country[$order_node->language][0]['value'] = $crawl_order['country'];
+      $order_node->field_order_pay_grand_total[$order_node->language][0]['value'] = $crawl_order['pay_grand'];
+      $order_node->field_order_crawled[$order_node->language][0]['value'] = 1;
+      node_save($order_node);
+      
+    }
+  }
+  else {
+    watchdog('Bricks bill crawler', 'Login not available', '', WATCHDOG_ERROR);
+  }  
   curl_close($login_session);
+}
+
+/**
+ * Implements hook_cron().
+ */
+function bricks_bill_crawler_cron() {
+  bricks_bill_crawler_start_crawler();
 }
 
 /*
@@ -98,5 +447,306 @@ function bricks_bill_crawler_login_bricklink() {
   curl_setopt($curl, CURLOPT_URL, $login_url);
   curl_exec($curl);
   
-  return  $curl;
-} 
+  // test login
+  curl_setopt($curl, CURLOPT_URL, 'http://www.bricklink.com/my.asp');
+  $order_data = curl_exec($curl);
+  if (strpos($order_data, 'Object Moved')) {
+    return false;
+  }
+  else {
+    return $curl;
+  }
+}
+
+/*
+ * load order nodes to crawl
+ */
+function bricks_bill_crawler_load_order_nodes($limit = 30) {
+  $order_nodes = array();
+  $query = new EntityFieldQuery;
+
+  $query->entityCondition('entity_type', 'node')
+        ->propertyCondition('type', 'orders')
+        ->fieldCondition('field_order_crawled', 'value', 0, '=')
+        ->range(0, $limit);
+    
+  foreach ($query->execute() as $entity_type => $entities) {
+      foreach ($entities as $entity_id => $entity) {
+        $order_nodes[] =  $entity;
+      }
+  }
+    
+  return $order_nodes;
+}
+
+/*
+ * load bill node to check
+ */
+function bricks_bill_crawler_load_bill_nodes($title) {
+  $bill_nodes = array();
+  $query = new EntityFieldQuery;
+
+  $query->entityCondition('entity_type', 'node')
+        ->propertyCondition('type', 'bill')
+        ->propertyCondition('title', $title)
+        ->range(0, 1);
+    
+  foreach ($query->execute() as $entity_type => $entities) {
+      foreach ($entities as $entity_id => $entity) {
+        $bill_nodes[] =  $entity;
+      }
+  }
+    
+  return $bill_nodes;
+}
+
+/*
+ * load bill node to check
+ */
+function bricks_bill_crawler_send_pdf_as_mail() {
+
+  $args = func_get_args();
+  $path = filter_xss(implode('/', $args));
+
+  // Handle the query
+  $query = $_GET;
+  unset($query['q']);
+
+  if (!empty($path)) {
+    if ($alias = drupal_lookup_path('source', $path)) {
+      // Alias
+      $path_arr = explode('/', $alias);
+      $node = node_load($path_arr[1]);
+    }
+    elseif (ctype_digit($args[0])) {
+      // normal nid
+      $node = node_load($args[0]);
+    }
+      $node->file = str_replace('public://', DRUPAL_ROOT . '/sites/default/files/', bricks_bill_crawler_get_folder_to_save($node) .  str_replace('#', '-', $node->field_bill_number[$node->language][0]["value"]) . '.pdf') ;
+      $node->filename = $node->field_bill_number[$node->language][0]["value"] . '.pdf';
+      bricks_bill_crawler_mail_send_bill($node);
+      drupal_set_message('Mail erfolgreich versendet an: ' . $node->field_bill_e_mail[$node->language][0]["value"]);
+      $node->field_bill_check_mail[$node->language][0]["value"] = 1;
+      node_save($node);
+      drupal_goto('node/' . $node->nid);
+  }
+  
+  drupal_set_message('Fehler beim Mailversand', 'warning');
+}
+
+/*
+ * load bill node to check
+ */
+function bricks_bill_crawler_save_pdf() {
+  require_once(DRUPAL_ROOT . '/' . drupal_get_path('module', 'print_pdf') . '/print_pdf.pages.inc');
+  // Disable caching for generated PDFs, as Drupal doesn't ouput the proper headers from the cache
+  $GLOBALS['conf']['cache'] = FALSE;
+
+  $args = func_get_args();
+  $path = filter_xss(implode('/', $args));
+  $cid = isset($_GET['comment']) ? (int)$_GET['comment'] : NULL;
+
+  // Handle the query
+  $query = $_GET;
+  unset($query['q']);
+ 
+  if (!empty($path)) {
+    if ($alias = drupal_lookup_path('source', $path)) {
+      // Alias
+      $path_arr = explode('/', $alias);
+      $node = node_load($path_arr[1]);
+    }
+    elseif (ctype_digit($args[0])) {
+      // normal nid
+      $node = node_load($args[0]);
+    }
+
+    $pdf_filename = variable_get('print_pdf_filename', PRINT_PDF_FILENAME_DEFAULT);
+    if (!empty($pdf_filename) && !empty($node)) {
+      $pdf_filename = token_replace($pdf_filename, array('node' => $node));
+    }
+    else {
+      $pdf_filename = token_replace($pdf_filename, array('site'));
+      if (empty($pdf_filename) || count(token_scan($pdf_filename))) {
+        // If there are still tokens, use a fallback solution
+        $pdf_filename = str_replace('/', '_', $path);
+      }
+    }
+  }
+  else {
+    $pdf_filename = 'page';
+  }
+  $pdf = print_pdf_generate_path($path, $query, $cid);  
+  $filename = bricks_bill_crawler_get_folder_to_save($node) . '/' . str_replace('#', '-', $node->field_bill_number[$node->language][0]["value"]) . '.pdf' ;
+  $file = file_save_data($pdf, $filename);
+  if ($file !== FALSE) {
+    $node->field_bill_check_pdf[$node->language][0]["value"] = 1;
+    node_save($node);
+  }
+
+  drupal_goto('node/' . $node->nid);
+}
+
+/*
+ * check and create folder to save
+ */
+function bricks_bill_crawler_get_folder_to_save($node) {
+    
+  $path = 'rechnungen/';
+  $path_eu_vat = '/eu-vat/';
+  $path_eu_non_vat = '/eu-non-vat/';
+  $path_non_eu = '/non-eu/';
+  $new_folder = false;
+  
+  $eu_country_array = array(
+    'Austria',
+    'Belgium',
+    'Bulgaria',
+    'Croatia',
+    'Czech Republic',
+    'Cyprus',
+    'Denmark',
+    'Estonia',
+    'Finland',
+    'France',
+    'Germany',
+    'Greece',
+    'Hungary',
+    'Ireland',
+    'Italy',
+    'Latvia',
+    'Lithuania',
+    'Luxembourg',
+    'Malta',
+    'Netherlands',
+    'Poland',
+    'Portugal',
+    'Romania',
+    'Slovakia',
+    'Slovenia',
+    'Spain',
+    'Sweden',
+    'United Kingdom',
+  );
+  
+  // EU ohne MwST
+  if (in_array($node->field_bill_country[$node->language][0]["value"], $eu_country_array) && $node->field_add_vat[$node->language][0]["value"] == 0) {
+    $new_folder = 'public://' . $path . date('F-Y', strtotime($node->field_bill_invoice_date['und']['0']['value'])) . $path_eu_non_vat; 
+    file_prepare_directory($new_folder, FILE_CREATE_DIRECTORY) ? '' : $new_folder = false;
+  }  
+  // EU mit MwST
+  if (in_array($node->field_bill_country[$node->language][0]["value"], $eu_country_array) && $node->field_add_vat[$node->language][0]["value"] == 1) {
+    $new_folder = 'public://' . $path . date('F-Y', strtotime($node->field_bill_invoice_date['und']['0']['value'])) . $path_eu_vat; 
+    file_prepare_directory($new_folder, FILE_CREATE_DIRECTORY) ? '' : $new_folder = false;
+  }
+  // nicht EU
+  if (!in_array($node->field_bill_country[$node->language][0]["value"], $eu_country_array)) {
+    $new_folder = 'public://' . $path . date('F-Y', strtotime($node->field_bill_invoice_date['und']['0']['value'])) . $path_non_eu; 
+    file_prepare_directory($new_folder, FILE_CREATE_DIRECTORY) ? '' : $new_folder = false;
+  }
+  
+  return $new_folder;
+}
+
+/** 
+ * Implements hook_mail().
+ */ 
+function bricks_bill_crawler_mail($key, &$message, $params) {
+  if (isset($params['subject'])) {
+    $message['subject'] = $params['subject'];
+  }
+  if (isset($params['body'])) {
+    $message['body'][] = $params['body'];
+  }
+  if (isset($params['attachment'])) {
+    $message['params']['attachments'][] = $params['attachment'];
+  }
+}
+
+/** 
+ * send bill .
+ */ 
+function bricks_bill_crawler_mail_send_bill($node) {
+  if ($node->field_bill_language[$node->language][0]["value"] == 'de') {
+    $subject = 'Deine BrickLink-Bestellung ' . $node->title . ' bei 44 Bricks - Versandbenachrichtigung und e-Rechnung';
+    $body = 'Hallo ' .$node->field_bill_salutation[$node->language][0]["value"] . ',
+            <br /><br /> 
+            Deine BrickLink-Bestellung ' . $node->title . ' bei 44 Bricks wurde versendet. 
+            <br /><br />
+            Diese E-Mail enthält Deine bereits bezahlte Rechnung ' .$node->field_bill_number[$node->language][0]["value"] . ' vom ' .$node->field_bill_invoice_date[$node->language][0]["value"] . ' über € ' . number_format($node->field_grand_total[$node->language][0]["value"], 2, ",", ",") . '
+            <br /><br /> 
+            Wenn Du mit Ihrere Bestellung und unserem Service zufrieden warst, würden wir uns sehr über positives Feedback von Dir freuen. Falls Du nicht zufrieden warst, kontaktiere uns bitte, damit wir uns umgehend darum kümmern können.
+            <br /><br />
+            Vielen Dank für Deine Bestellung!
+            <br /><br />
+            <br />
+            Mit freundlichen Grüßen aus Dresden,
+            <br /><br />
+            Dein 44 Bricks Team
+            <br /><br />
+            ---
+            <p style = "color=646D7E">44 Bricks UG (haftungsbeschränkt)
+            <br /><br />
+            Königstr. 17<br />
+            D-01097 Dresden<br />
+            Deutschland<br />
+            <br /><br />
+            Tel: +49(0)351 - 21966427<br />
+            Fax: +49(0)351 - 80806-98<br />
+            E-Mail: <a href="mailto:info@44bricks.com">info@44bricks.com</a><br />
+            Web: <a href="http://www.44bricks.com">www.44bricks.com</a><br />
+            <br /><br />
+            Geschäftsführer: Dennis Becker, Richard Müller<br />
+            HRB 29817 | Amtsgericht Dresden<br />
+            USt-IdNr.: DE276778872<br />
+            Steuer-Nr.: 202/106/08762</p>';
+  }
+  else {
+    $subject = 'Your BrickLink Order ' . $node->title . ' at 44 Bricks - Shipment Notice and e-Invoice';
+    $body = 'Dear ' .$node->field_bill_salutation[$node->language][0]["value"] . ',
+<br /><br /> 
+Your BrickLink Order ' . $node->title . ' at 44 Bricks has been shipped.
+<br /><br />
+This E-Mail contains your settled invoice ' .$node->field_bill_number[$node->language][0]["value"] . ' from ' .$node->field_bill_invoice_date[$node->language][0]["value"] . ' amounting to € ' . number_format($node->field_grand_total[$node->language][0]["value"], 2, ",", ",") . '.
+<br /><br /> 
+If you were satisfied with your order and our service, we would really appreciate to receive positive feedback from you. In case you are not satisfied, please contact us so we can see to it immediately.
+<br /><br />
+Thank you very much for your order!
+<br /><br />
+<br />
+Best Regards from Germany,
+<br /><br />
+Your 44 Bricks Team
+<br /><br />
+---
+<p style = "color=646D7E">44 Bricks UG (haftungsbeschränkt)
+<br /><br />
+Königstr. 17<br />
+D-01097 Dresden<br />
+Germany<br />
+<br /><br />
+Tel: +49(0)351 - 21966427<br />
+Fax: +49(0)351 - 80806-98<br />
+E-Mail: <a href="mailto:info@44bricks.com">info@44bricks.com</a><br />
+Web: <a href="http://www.44bricks.com">www.44bricks.com</a><br />
+<br /><br />
+Managing Directors: Dennis Becker, Richard Müller<br />
+HRB 29817 | Amtsgericht Dresden<br />
+VAT-ID: DE276778872<br />
+Tax-ID: 202/106/08762</p>';
+  }
+  
+  $to = $node->field_bill_e_mail[$node->language][0]["value"]; //gets the current user's mail address
+  $from = variable_get('site_mail', ''); //admin's mail address
+  $attachment = array(
+    'filecontent' => file_get_contents($node->file),
+    'filename' => $node->filename, // You can change the name and extension of the file you need to send.
+    'filemime' => 'text/plain',  
+  );
+  $message = drupal_mail('bricks_bill_crawler', 'bill_mail', $to, 'und', array('body' => $body, 'subject' => $subject, 'attachment' => $attachment), $from, TRUE);
+       
+}
+
+function br2nl($string) {
+  return preg_replace('/\<br(\s*)?\/?\>/i', "\n", $string);
+}            
