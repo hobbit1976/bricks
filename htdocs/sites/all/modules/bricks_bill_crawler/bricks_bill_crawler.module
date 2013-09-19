@@ -1,7 +1,7 @@
 <?php
 
 function bricks_bill_crawler_admin_paths_alter(&$paths) {
-  $paths['node/*/edit'] = TRUE;
+ // $paths['node/*/edit'] = TRUE;
 }
 
 /** 
@@ -23,6 +23,17 @@ function bricks_bill_crawler_theme($existing, $type, $theme, $path) {
  */
 function template_preprocess_bill_node_form(&$variables) {
   
+}
+
+/* 
+ * Implements hook_node_update().
+ */
+function bricks_bill_crawler_node_presave($node) {
+  if ($node->type == 'bill') {
+    foreach ($node->field_bill_items_unit_price[$node->language] as $key => $value) {
+      $node->field_bill_items_total_price[$node->language][$key]['value'] = (string) ($node->field_bill_items_quantity[$node->language][$key]['value'] * $node->field_bill_items_unit_price[$node->language][$key]['value']);
+    }
+  }
 }
 
 /* 
