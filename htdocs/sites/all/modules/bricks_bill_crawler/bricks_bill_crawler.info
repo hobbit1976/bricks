@@ -1,3 +1,4 @@
 name = 44bricks bill crawler
 package = 44bricks
+version = "7.x-1.0dev"
 core = 7.x
