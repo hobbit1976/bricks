@@ -95,6 +95,8 @@ function bricks_bill_crawler_node_update($node) {
       $bill_node->field_bill_check_mail[$node->language][0]["value"] = 0;
       // ohne MwSt.
       $bill_node->field_add_vat[$node->language][0]["value"] = 0;
+      // 'Rechnung von' setzen
+      $bill_node->field_bill_from[$node->language][0]["value"] = 'BrickLink'; 
       // Order Items setzen
       $sum_extra_parts = 0.000;
       $item_numbers = 1;

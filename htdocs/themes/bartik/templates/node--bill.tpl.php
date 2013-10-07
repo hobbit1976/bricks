@@ -1,4 +1,6 @@
 <?php
+  // BrickLinks bei Rechnung von setzen
+  (strpos($node->field_bill_number[$node->language][0]['value'], 'BL#') && empty($node->field_bill_from[$node->language][0]['value'])) ? $node->field_bill_from[$node->language][0]['value'] = 'BrickLinks' : '';
   // incl. MwSt.
   $add_vat = $content['field_add_vat']['#items'][0]["value"];
   // PAYCURRENCYCODE
@@ -29,7 +31,7 @@
     $bricks_bill_invoice_date = '<div style="float: left">Rechnungsdatum:&nbsp;</div>';
     $bricks_bill_term_of_payment = '<div style="float: left">Zahlungsziel:&nbsp;</div>';
     $bricks_bill_salutation = '<div style="float: left">Hallo&nbsp;</div>';
-    $bricks_bill_salutation_part_2 = '<div style="float: left">gemäß Deiner BrickLink-Bestellung&nbsp;</div>';
+    $bricks_bill_salutation_part_2 = '<div style="float: left">gemäß Deiner ' . ((isset($node->field_bill_from[$node->language][0]['value']) && !empty($node->field_bill_from[$node->language][0]['value'])) ? ($node->field_bill_from[$node->language][0]['value'] . '-') : '') . 'Bestellung&nbsp;</div>';
     $bricks_bill_salutation_part_3 = '<div style="float: rigth">&nbsp;berechnen wir Dir folgenden Auftrag:</div>';
     $bricks_bill_coupon_1 = 'R';
     $bricks_bill_coupon_1 = 'Rabatt';
@@ -74,7 +76,7 @@
     $bricks_bill_invoice_date = '<div style="float: left">Invoice date:&nbsp;</div>';
     $bricks_bill_term_of_payment = '<div style="float: left">Term of payment:&nbsp;</div>';
     $bricks_bill_salutation = '<div style="float: left">Dear&nbsp;</div>';
-    $bricks_bill_salutation_part_2 = '<div style="float: left">according to your BrickLink-Order&nbsp;</div>';
+    $bricks_bill_salutation_part_2 = '<div style="float: left">according to your ' . ((isset($node->field_bill_from[$node->language][0]['value']) && !empty($node->field_bill_from[$node->language][0]['value'])) ? ($node->field_bill_from[$node->language][0]['value'] . '-') : '') . 'Order&nbsp;</div>';
     $bricks_bill_salutation_part_3 = '<div style="float: rigth">&nbsp;we invoice you for the following goods:</div>';
     $bricks_bill_coupon_1 = 'C';
     $bricks_bill_coupon_1 = 'Credit';

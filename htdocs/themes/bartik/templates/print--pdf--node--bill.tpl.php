@@ -1,5 +1,7 @@
 <?php
   $content = (array) $node;
+  // BrickLinks bei Rechnung von setzen
+  (strpos($node->field_bill_number[$node->language][0]['value'], 'BL#') && empty($node->field_bill_from[$node->language][0]['value'])) ? $node->field_bill_from[$node->language][0]['value'] = 'BrickLinks' : '';
   // incl. MwSt.  
   $add_vat = $content['field_add_vat']['und'][0]["value"];
   // PAYCURRENCYCODE
@@ -30,7 +32,7 @@
     $bricks_bill_invoice_date = 'Rechnungsdatum:&nbsp;';
     $bricks_bill_term_of_payment = 'Zahlungsziel:&nbsp;';
     $bricks_bill_salutation = 'Hallo';
-    $bricks_bill_salutation_part_2 = 'gemäß Deiner BrickLink-Bestellung';
+    $bricks_bill_salutation_part_2 = 'gemäß Deiner ' . ((isset($node->field_bill_from[$node->language][0]['value']) && !empty($node->field_bill_from[$node->language][0]['value'])) ? ($node->field_bill_from[$node->language][0]['value'] . '-') : '') . 'Bestellung';
     $bricks_bill_salutation_part_3 = 'berechnen wir Dir folgenden Auftrag:';
     $bricks_bill_shipping_parts_1 = 'V';
     $bricks_bill_shipping_parts_2 = 'Verpackung & Versand';
@@ -75,7 +77,7 @@
     $bricks_bill_invoice_date = 'Invoice date:&nbsp;';
     $bricks_bill_term_of_payment = 'Term of payment:&nbsp;';
     $bricks_bill_salutation = 'Dear';
-    $bricks_bill_salutation_part_2 = 'according to your BrickLink-Order';
+    $bricks_bill_salutation_part_2 = 'according to your ' . ((isset($node->field_bill_from[$node->language][0]['value']) && !empty($node->field_bill_from[$node->language][0]['value'])) ? ($node->field_bill_from[$node->language][0]['value'] . '-') : '') . 'Order';
     $bricks_bill_salutation_part_3 = 'we invoice you for the following goods:';
     $bricks_bill_coupon_1 = 'C';
     $bricks_bill_coupon_1 = 'Credit';
