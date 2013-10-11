@@ -30,9 +30,12 @@ function template_preprocess_bill_node_form(&$variables) {
  */
 function bricks_bill_crawler_node_presave($node) {
   if ($node->type == 'bill') {
+    $total_sum = 0;
     foreach ($node->field_bill_items_unit_price[$node->language] as $key => $value) {
       $node->field_bill_items_total_price[$node->language][$key]['value'] = (string) ($node->field_bill_items_quantity[$node->language][$key]['value'] * $node->field_bill_items_unit_price[$node->language][$key]['value']);
+      $total_sum = $total_sum + $node->field_bill_items_total_price[$node->language][$key]['value'];
     }
+    $node->field_grand_total[$node->language][$key]['value'] = $total_sum;
   }
 }
 
@@ -206,6 +209,10 @@ function bricks_bill_crawler_node_update($node) {
       }
     }
   }
+  // DATEV Node speichern
+  if ($node->type == 'bill' && $node->field_bill_check_pdf[$node->language][0]["value"] == 1 && $node->field_bill_cancel[$node->language][0]["value"] != 1) {
+    bricks_bill_crawler_save_datev_export($node);
+  }
 }
 
 /* 
@@ -218,12 +225,12 @@ function bricks_bill_crawler_menu() {
 //    'page arguments' => array('bricks_bill_crawler_xml_upload_form'),
 //    'access arguments' => array('access content overview'),
 //  );
-  // $items['admin/bill_crawler'] = array(
-    // 'title' => 'Bricks bill crawler',
-    // 'page callback' => 'bricks_bill_crawler_start_crawler_test',
-    // 'access arguments' => array('access content overview'),
-    // 'type' => MENU_CALLBACK,
-  // );
+   $items['admin/bill_crawler'] = array(
+     'title' => 'Bricks bill crawler',
+     'page callback' => 'bricks_bill_crawler_start_crawler_test',
+     'access arguments' => array('access content overview'),
+     'type' => MENU_CALLBACK,
+   );
   
   $items['savePDF'] = array(
     'title' => 'Save node as PDF',
@@ -339,11 +346,9 @@ function bricks_bill_crawler_item_crawl($item) {
  * start crawler test
  */
 function bricks_bill_crawler_start_crawler_test() {
-  $node = new stdClass();
-  $node->field_bill_country['und'][0]["value"] = 'Germany';
-  $node->field_add_vat['und'][0]["value"] = 1;
-  $node->language = 'und';
-  $path = bricks_bill_crawler_get_folder_to_save($node);var_dump($path);
+  //$test_node = node_load(368);
+  //bricks_bill_crawler_save_datev_export($test_node);
+  //bricks_bill_crawler_create_all_datev_node();
 } 
 
 /*
@@ -413,6 +418,7 @@ function bricks_bill_crawler_start_crawler() {
  */
 function bricks_bill_crawler_cron() {
   bricks_bill_crawler_start_crawler();
+  //bricks_bill_crawler_create_all_datev_node();
 }
 
 /*
@@ -751,4 +757,186 @@ Tax-ID: 202/106/08762</p>';
 
 function br2nl($string) {
   return preg_replace('/\<br(\s*)?\/?\>/i', "\n", $string);
-}            
+}
+
+function bricks_bill_crawler_save_datev_export($bill_node) {
+  // vorhandenen Datev-Node laden
+  $datev_node = bricks_bill_crawler_load_datev_node($bill_node->nid);
+  if (empty($datev_node)) {
+    // Objekt anlegen
+    $datev_node = new stdClass();
+    // Typ festlegen
+    $datev_node->type = 'datev_export';
+    // default Werte setzen
+    node_object_prepare($datev_node);
+    // UID auf Admin setzen
+    $datev_node->uid = 1;
+    // nicht voröffentlichen
+    $datev_node->status = 0;
+    $datev_node->promote = 0;
+    // Sprache auf neutral setzen
+    $datev_node->language = LANGUAGE_NONE;
+    // OrderID als Titel setzen
+    $datev_node->title = $bill_node->field_bill_number[$bill_node->language][0]["value"];
+    // Währung setzen
+    $waehrung = 'EUR';
+    $betrag = 0;
+    foreach ($bill_node->field_bill_items_unit_price[$bill_node->language] as $key => $value) {
+      $bill_node->field_bill_items_total_price[$bill_node->language][$key]['value'] = (string) ($bill_node->field_bill_items_quantity[$bill_node->language][$key]['value'] * $bill_node->field_bill_items_unit_price[$bill_node->language][$key]['value']);
+      $betrag = $betrag + $bill_node->field_bill_items_total_price[$bill_node->language][$key]['value'];
+    }
+    if (isset($bill_node->field_grand_total_in_payment[$bill_node->language][0]["value"]) && !empty($bill_node->field_grand_total_in_payment[$bill_node->language][0]["value"])) {
+      if (strpos($bill_node->field_grand_total_in_payment[$bill_node->language][0]["value"], '$')) {
+        $waehrung = 'USD';
+        $betrag = trim($bill_node->field_grand_total_in_payment[$bill_node->language][0]["value"], 'US&nbsp;$');
+      }
+    }
+    $datev_node->field_datev_waehrung[$datev_node->language][0]["value"] = $waehrung;
+    // Betrag setzen
+    $datev_node->field_datev_betrag[$datev_node->language][0]["value"] = str_replace(',', '.', $betrag);
+    // Gegenkonto setzen
+    $datev_node->field_datev_gegenkonto[$datev_node->language][0]["value"] = bricks_bill_crawler_check_eu($bill_node->field_bill_country[$bill_node->language][0]["value"]) == TRUE ? 4200 : 4120;
+    // Debitorenkonto setzen
+    $datev_debitorenkonto = variable_get('datev_debitorenkonto', 10000);
+    if (variable_get('datev_debitorenkonto', 10000) >= 1000 && variable_get('datev_debitorenkonto', 10000)<= 69999) {
+      variable_set('datev_debitorenkonto', $datev_debitorenkonto+1);
+    }
+    else {
+      variable_set('datev_debitorenkonto', 10000);
+    }
+    $datev_node->field_datev_debitorenkonto[$datev_node->language][0]["value"] = $datev_debitorenkonto;
+    // Datum setzen 2013-10-09 00:00:00
+    $datev_node->field_datev_rechnungsdatum[$datev_node->language][0]["value"] = date('Y-m-d 00:00:00', strtotime($bill_node->field_bill_invoice_date[$bill_node->language][0]["value"]));
+    // Anrede setzen
+    $datev_node->field_datev_anrede[$datev_node->language][0]["value"] = $bill_node->field_bill_salutation[$bill_node->language][0]["value"];
+    // Adresszeilen setzen
+    $adresszeilen = str_replace('<br>', '<BR>', $bill_node->field_bill_address[$bill_node->language][0]["value"]);
+    $adresszeilen_array = explode('<BR>', $adresszeilen);
+    array_shift($adresszeilen_array);
+    foreach ($adresszeilen_array as $key => $value) {
+      $datev_node->field_datev_adresszeilen[$datev_node->language][$key]["value"] = strip_tags($value); 
+    }      
+    // Ref Node ID setzen
+    $datev_node->field_datev_ref_rechnung[$datev_node->language][0]["target_id"] = $bill_node->nid;
+    // Node speichern
+    node_save($datev_node);
+  }
+  else {
+    $datev_node = node_load($datev_node[0]->nid);
+    // OrderID als Titel setzen
+    $datev_node->title = $bill_node->field_bill_number[$bill_node->language][0]["value"];
+    // Währung setzen
+    $waehrung = 'EUR';
+    $betrag = 0;
+    foreach ($bill_node->field_bill_items_unit_price[$bill_node->language] as $key => $value) {
+      $bill_node->field_bill_items_total_price[$bill_node->language][$key]['value'] = (string) ($bill_node->field_bill_items_quantity[$bill_node->language][$key]['value'] * $bill_node->field_bill_items_unit_price[$bill_node->language][$key]['value']);
+      $betrag = $betrag + $bill_node->field_bill_items_total_price[$bill_node->language][$key]['value'];
+    }
+    if (isset($bill_node->field_grand_total_in_payment[$bill_node->language][0]["value"]) && !empty($bill_node->field_grand_total_in_payment[$bill_node->language][0]["value"])) {
+      if (strpos($bill_node->field_grand_total_in_payment[$bill_node->language][0]["value"], '$')) {
+        $waehrung = 'USD';
+        $betrag = trim($bill_node->field_grand_total_in_payment[$bill_node->language][0]["value"], 'US&nbsp;$');
+      }
+    }
+    $datev_node->field_datev_waehrung[$datev_node->language][0]["value"] = $waehrung;
+    // Betrag setzen
+    $datev_node->field_datev_betrag[$datev_node->language][0]["value"] = str_replace(',', '.', $betrag);
+    // Gegenkonto setzen
+    $datev_node->field_datev_gegenkonto[$datev_node->language][0]["value"] = bricks_bill_crawler_check_eu($bill_node->field_bill_country[$bill_node->language][0]["value"]) == TRUE ? 4200 : 4120;
+   
+    $datev_node->field_datev_debitorenkonto[$datev_node->language][0]["value"] = $datev_debitorenkonto;
+    // Datum setzen 2013-10-09 00:00:00
+    $datev_node->field_datev_rechnungsdatum[$datev_node->language][0]["value"] = date('Y-m-d 00:00:00', strtotime($bill_node->field_bill_invoice_date[$bill_node->language][0]["value"]));
+    // Anrede setzen
+    $datev_node->field_datev_anrede[$datev_node->language][0]["value"] = $bill_node->field_bill_salutation[$bill_node->language][0]["value"];
+    // Adresszeilen setzen
+    $adresszeilen = str_replace('<br>', '<BR>', $bill_node->field_bill_address[$bill_node->language][0]["value"]);
+    $adresszeilen_array = explode('<BR>', $adresszeilen);
+    array_shift($adresszeilen_array);
+    foreach ($adresszeilen_array as $key => $value) {
+      $datev_node->field_datev_adresszeilen[$datev_node->language][$key]["value"] = strip_tags($value); 
+    }      
+    // Ref Node ID setzen
+    $datev_node->field_datev_ref_rechnung[$datev_node->language][0]["target_id"] = $bill_node->nid;
+    // Node speichern
+    node_save($datev_node);
+  }
+}
+
+/*
+ * load datev node to check
+ */
+function bricks_bill_crawler_load_datev_node($ref_nid) {
+  $datev_node = array();
+  $query = new EntityFieldQuery;
+
+  $query->entityCondition('entity_type', 'node')
+        ->propertyCondition('type', 'datev_export')
+        ->fieldCondition('field_datev_ref_rechnung', 'target_id', $ref_nid, '=')
+        ->range(0, 1);
+    
+  foreach ($query->execute() as $entity_type => $entities) {
+      foreach ($entities as $entity_id => $entity) {
+        $datev_node[] =  $entity;
+      }
+  }
+    
+  return $datev_node;
+}
+
+/*
+ * load datev node to check
+ */
+function bricks_bill_crawler_create_all_datev_node() {
+  
+    $query = new EntityFieldQuery;
+  
+    $query->entityCondition('entity_type', 'node')
+          ->propertyCondition('type', 'bill')
+          ->fieldCondition('field_bill_check_pdf', 'value', 1, '=');
+      
+    foreach ($query->execute() as $entity_type => $entities) {
+        foreach ($entities as $entity_id => $entity) {
+          $bill_node =  node_load($entity->nid);
+          bricks_bill_crawler_save_datev_export($bill_node);
+        }
+    }
+}
+
+/*
+ * check EU
+ */ 
+function bricks_bill_crawler_check_eu($country) {
+  $eu_country_array = array(
+    'Austria',
+    'Belgium',
+    'Bulgaria',
+    'Croatia',
+    'Czech Republic',
+    'Cyprus',
+    'Denmark',
+    'Estonia',
+    'Finland',
+    'France',
+    'Germany',
+    'Greece',
+    'Hungary',
+    'Ireland',
+    'Italy',
+    'Latvia',
+    'Lithuania',
+    'Luxembourg',
+    'Malta',
+    'Netherlands',
+    'Poland',
+    'Portugal',
+    'Romania',
+    'Slovakia',
+    'Slovenia',
+    'Spain',
+    'Sweden',
+    'United Kingdom',
+  );
+  
+  return in_array($country, $eu_country_array);
+}
