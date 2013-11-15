@@ -216,6 +216,21 @@ function bricks_bill_crawler_node_update($node) {
 }
 
 /* 
+ * Implements hook_node_delete().
+ */
+function bricks_bill_crawler_node_delete($node) {
+  // DATEV Node löschen
+  if ($node->type == 'bill') {    
+    // vorhandenen Datev-Node laden
+    $datev_node = bricks_bill_crawler_load_datev_node($node->nid);
+    if (!empty($datev_node)) {
+      $datev_node = node_load($datev_node[0]->nid);
+      node_delete($datev_node->nid);
+    }
+  }
+}
+
+/* 
  * Implements hook_menu().
  */
 function bricks_bill_crawler_menu() {
