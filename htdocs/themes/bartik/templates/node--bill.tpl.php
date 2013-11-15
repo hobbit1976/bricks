@@ -137,7 +137,7 @@
     <img style="height: 3.0cm; position: absolute; right: 2.0mm" src="<?php print '/' . drupal_get_path('theme', 'bartik') . '/templates/bricks-logo.jpg'; ?>" />
   </div>
   
-  <div style="position: relative; margin-left: auto; margin-right: auto; width: 300px; font-size: 16px; color: red">Anmerkungen: <?php print $node->field_bill_orderremarks[$node->language][0]["value"]; ?></div>
+  <div style="position: relative; margin-left: auto; margin-right: auto; width: 300px; font-size: 16px; color: red">Anmerkungen: <?php print (isset($node->field_bill_orderremarks[$node->language][0]["value"]) ? $node->field_bill_orderremarks[$node->language][0]["value"] : ''); ?></div>
   
   <div style="position: relative; display: table; width: 100%">
     <div style="display: table-row; position: relative">
@@ -204,7 +204,10 @@
     </div>
     
     <?php print $raw_items; ?>
-<!--    
+    
+    
+    
+<?php if ('Wird nicht gebraucht gerade' === 1): ?>   
     <div class="bill-items" style="border-bottom: 0.1mm solid grey; border-top: 0.1mm solid grey; display: table-row; position: relative; width: 100%; font-weight: bold">
       <div style="width: 1.0cm; display: table-cell; padding-left: 2mm; padding-right: 2mm">
         <?php print $items_count+1; ?>
@@ -225,7 +228,10 @@
         <?php print number_format(($content['field_shipping_packaging']['#items'][0]["value"] * ($add_vat ==1 ? 0.81 : 1)), 2, ',', '.'); ?> €
       </div>
     </div>    
--->    
+<?php endif; ?>  
+
+
+ 
     <div class="bill-items" style="display: table-row; position: relative; width: 100%; border-top: 0.2mm solid grey">
       <div style="width: 1.0cm; display: table-cell; padding-left: 2mm; padding-right: 2mm">
         <?php print ' '; ?>
@@ -248,7 +254,7 @@
     </div> 
     
     <?php if ($add_vat == 1): ?>
-    <div class="bill-items" style="display: table-row; position: relative; width: 100%>
+    <div class="bill-items" style="display: table-row; position: relative; width: 100%">
       <div style="width: 1.0cm; display: table-cell; padding-left: 2mm; padding-right: 2mm">
         <?php print ' '; ?>
       </div>
