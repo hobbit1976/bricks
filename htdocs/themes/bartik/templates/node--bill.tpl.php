@@ -48,7 +48,9 @@
     $bricks_bill_grand_total = 'Endsumme';
     $bricks_bill_grand_total_payment = 'Endsumme in Zahlwährung';
     $bricks_bill_not_vat_text = 'Rechnung gem. § 25a UStG (Anwendung der Differenzbesteuerung, MwSt. nicht ausweisbar)';
-    $bricks_bill_text_paymenttype = 'Die Zahlung erfolgte per'; 
+    $bricks_bill_text_paymenttype = 'Die Zahlung erfolgte per';
+    $print_paypal_id = '';
+    if ($node->field_bill_from[$node->language][0]["value"] == 'ebay' && $node->field_bill_paymenttype[$node->language][0]["value"] == 'PayPal') {$print_paypal_id = '(Transaktionscode ' . $node->field_bill_paypal_id[$node->language][0]["value"] . ')';} 
     $bricks_bill_text_signatur = 'Vielen Dank für Deine Bestellung!<br /><br />Mit freundlichen Grüßen,<br />Dein 44 Bricks Team';
     $bricks_bill_text_footer_1 = '<b>Geschäftsführer:</b><br />Richard Müller, Dennis Becker<br /><br /><b>Sitz der Gesellschaft:</b><br />Dresden, Deutschland';
     $bricks_bill_text_footer_2 = '<b>Gerichtsstand:</b><br />HRB 29817 Amtsgericht Dresden<br /><br />USt-IdNr. DE276778872<br />St.-Nr. 202/106/08762';
@@ -92,6 +94,8 @@
     $bricks_bill_table_header_total_price = 'Total Price net';
     $bricks_bill_grand_total = 'Grant-total';
     $bricks_bill_grand_total_payment = 'Order pay grand total';
+    $print_paypal_id = '';
+    if ($node->field_bill_from[$node->language][0]["value"] == 'ebay' && $node->field_bill_paymenttype[$node->language][0]["value"] == 'PayPal') {$print_paypal_id = '(transaction ID ' . $node->field_bill_paypal_id[$node->language][0]["value"] . ')';} 
     $bricks_bill_not_vat_text = 'Invoice according to § 25a UStG (subject to differential taxation, VAT cannot be stated separately)';
     $bricks_bill_text_paymenttype = 'The payment has been made via'; 
     $bricks_bill_text_signatur = 'Thank you very much for your order!<br /><br />Best regards,<br />Your 44 Bricks Team';
@@ -271,7 +275,7 @@
         <?php print $bricks_bill_add_vat;?>
       </div>
       <div style="width: 2.25cm; display: table-cell; text-align: right; padding-left: 2mm; padding-right: 2mm">
-        <?php print number_format(($sum_items * 0.19), 2, ',', '.'); ?> €
+        <?php print number_format(($sum_items / 1.19 * 0.19), 2, ',', '.'); ?> €
       </div>
     </div>
     <?php endif; ?>
@@ -334,7 +338,7 @@
       </p>
     <?php endif;?>
     <p>
-      <?php print $bricks_bill_text_paymenttype . ' ' . $content['field_bill_paymenttype']['#items'][0]["value"]; ?>.
+      <?php print $bricks_bill_text_paymenttype . ' ' . $content['field_bill_paymenttype']['#items'][0]["value"]; ?>. <?php !empty($print_paypal_id) ? print $print_paypal_id : ''; ?>
     </p>
     <p>
       <?php print $bricks_bill_text_signatur; ?>

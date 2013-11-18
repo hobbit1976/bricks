@@ -259,6 +259,12 @@ function bricks_bill_crawler_menu() {
     'access arguments' => array('access content overview'),
   );
   
+  $items['bill_crawler_import_ebay_csv'] = array(
+    'title' => 'Import ebay csv',
+    'page callback' => 'bricks_bill_crawler_import_ebay_csv',
+    'access arguments' => array('access content overview'),
+  );
+  
 //  $items['admin/bill_crawler/startcrawler'] = array(
 //    'title' => 'Crawler starten',
 //    'page callback' => 'bricks_bill_crawler_start_crawler',
@@ -651,6 +657,34 @@ function bricks_bill_crawler_get_folder_to_save($node) {
     'Spain',
     'Sweden',
     'United Kingdom',
+    'Belgien',
+    'Bulgarien',
+    'Dänemark',
+    'Deutschland',
+    'Estland',
+    'Finnland',
+    'Frankreich',
+    'Griechenland',
+    'Irland',
+    'Italien',
+    'Kroatien',
+    'Lettland',
+    'Litauen',
+    'Luxemburg',
+    'Malta',
+    'Niederlande',
+    'Österreich',
+    'Polen',
+    'Portugal',
+    'Rumänien',
+    'Schweden',
+    'Slowakei',
+    'Slowenien',
+    'Spanien',
+    'Tschechische Republik',
+    'Ungarn',
+    'Großbrittanien',
+    'Zypern',
   );
   
   // EU ohne MwST
@@ -923,6 +957,9 @@ function bricks_bill_crawler_create_all_datev_node() {
  * check EU
  */ 
 function bricks_bill_crawler_check_eu($country) {
+  
+  if (bricks_bill_crawler_check_ebay_eu($country) == true) {return true;}
+  
   $eu_country_array = array(
     'Austria',
     'Belgium',
@@ -952,6 +989,44 @@ function bricks_bill_crawler_check_eu($country) {
     'Spain',
     'Sweden',
     'United Kingdom',
+  );
+  
+  return in_array($country, $eu_country_array);
+}
+
+/*
+ * check ebay EU
+ */ 
+function bricks_bill_crawler_check_ebay_eu($country) {
+  $eu_country_array = array(
+    'Belgien',
+    'Bulgarien',
+    'Dänemark',
+    'Deutschland',
+    'Estland',
+    'Finnland',
+    'Frankreich',
+    'Griechenland',
+    'Irland',
+    'Italien',
+    'Kroatien',
+    'Lettland',
+    'Litauen',
+    'Luxemburg',
+    'Malta',
+    'Niederlande',
+    'Österreich',
+    'Polen',
+    'Portugal',
+    'Rumänien',
+    'Schweden',
+    'Slowakei',
+    'Slowenien',
+    'Spanien',
+    'Tschechische Republik',
+    'Ungarn',
+    'Großbrittanien',
+    'Zypern'
   );
   
   return in_array($country, $eu_country_array);
@@ -996,6 +1071,7 @@ function bricks_bill_crawler_import_ebay_csv() {
         // rechnungsdaten auslesen
         $rechnungs_array['rechnungsnummer'] = $data[0];
         $rechnungs_array['name'] = $data[2];
+        $rechnungs_array['email'] = $data[4];
         $rechnungs_array['addresse_1'] = $data[5];
         $rechnungs_array['addresse_2'] = $data[6];
         $rechnungs_array['plz'] = $data[9];
@@ -1012,7 +1088,8 @@ function bricks_bill_crawler_import_ebay_csv() {
         
         $rechnungs_array['art_mwst'] = $data[16];
         $rechnungs_array['art_versand'] = $data[17];
-        $rechnungs_array['art_zahlung'] = $data[21];        
+        $rechnungs_array['art_zahlung'] = $data[21]; 
+        $rechnungs_array['paypal_id'] = $data[36];        
       }
     }
 
@@ -1031,7 +1108,10 @@ function bricks_bill_crawler_import_ebay_csv() {
     }
     fclose($ebay_csv);
   }
-  
+  else {
+    drupal_set_message('ebay csv nicht vorhanden!');     
+  }
+  drupal_goto('');
 }
 
 /*
@@ -1069,13 +1149,13 @@ function bricks_bill_crawler_save_ebay_bill($rechnungs_array = array()) {
       // Zahlungsziel setzen
       $bill_node->field_bill_term_of_payment[$bill_node->language][0]["value"] = $language == 'de' ? 'sofort fällig' : 'immediately due and payable';
       // Anrede setzen
-      $bill_node->field_bill_salutation[$bill_node->language][0]["value"] = $rechnungs_array['name'];
+      $bill_node->field_bill_salutation[$bill_node->language][0]["value"] = utf8_encode($rechnungs_array['name']);
       // Adresse setzen
-      $bill_node->field_bill_address[$bill_node->language][0]["value"] = utf8_encode($rechnungs_array['name']) . '<br />' .  utf8_encode($rechnungs_array['addresse_1']) . '<br />' . utf8_encode($rechnungs_array['addresse_2']) . '<br />' . utf8_encode($rechnungs_array['plz']) . ' ' . utf8_encode($rechnungs_array['ort']) . '<br />' . utf8_encode($rechnungs_array['land']);
+      $bill_node->field_bill_address[$bill_node->language][0]["value"] = utf8_encode($rechnungs_array['name']) . '<br />' .  utf8_encode($rechnungs_array['addresse_1']) . '<br />' . utf8_encode($rechnungs_array['addresse_2']) . '<br />' . utf8_encode($rechnungs_array['plz']) . ', ' . utf8_encode($rechnungs_array['ort']) . (utf8_encode($rechnungs_array['region']) == 'default' ? '' : (utf8_encode($rechnungs_array['region']) . '<br />')) . '<br />' . utf8_encode($rechnungs_array['land']);
       // Herkunftsland setzen
-      $bill_node->field_bill_country[$bill_node->language][0]["value"] = $rechnungs_array['land']; 
+      $bill_node->field_bill_country[$bill_node->language][0]["value"] = utf8_encode($rechnungs_array['land']); 
       // E-Mail setzen
-      //$bill_node->field_bill_e_mail[$bill_node->language][0]["value"] = '';
+      $bill_node->field_bill_e_mail[$bill_node->language][0]["value"] = $rechnungs_array['email'];
       // Anmerkung setzen
       //$bill_node->field_bill_orderremarks[$bill_node->language][0]["value"] = '';
       // PDF-Erzeugung setzen
@@ -1100,19 +1180,14 @@ function bricks_bill_crawler_save_ebay_bill($rechnungs_array = array()) {
           $bill_node->field_bill_items_description[$bill_node->language][]["value"] = utf8_encode($value['art_bezeichnung']);
           $bill_node->field_bill_items_quantity[$bill_node->language][]["value"] = $value['art_stueckzahl'];
           $bill_node->field_bill_items_unit_price[$bill_node->language][]["value"] = str_replace(',', '.', str_replace('EUR ', '', $value['art_preis']));          
-   //       $bill_node->field_bill_items_total_price[$bill_node->language][]["value"] = $value['art_stueckzahl'] * str_replace(',', '.', str_replace('EUR ', '', $value['art_preis']));
           $item_numbers++;
         }
       }
  
       // Versand setzen 
       $bill_node->field_shipping_packaging[$bill_node->language][0]["value"] = str_replace(',', '.', str_replace('EUR ', '', $rechnungs_array['art_versand'])); 
-      
-//      $bill_node->field_sub_total[$node->language][0]["value"] = $node->field_basegrandtotal[$node->language][0]["value"];
-//      $bill_node->field_grand_total[$node->language][0]["value"] = $node->field_basegrandtotal[$node->language][0]["value"];
-     
-    
-      if (!empty($rechnungs_array['art_versand']) && $rechnungs_array['art_versand'] > 0) {             
+  
+      if (!empty($rechnungs_array['art_versand']) && strlen($rechnungs_array['art_versand']) > 0) {             
         $bill_node->field_bill_items_item[$bill_node->language][]["value"] = $item_numbers;
         $bill_node->field_bill_items_number[$bill_node->language][]["value"] = $language == 'de' ? 'V' : 'S';
         $bill_node->field_bill_items_description[$bill_node->language][]["value"] = $language == 'de' ? 'Verpackung & Versand' : 'Shipping & Packaging';
@@ -1122,15 +1197,8 @@ function bricks_bill_crawler_save_ebay_bill($rechnungs_array = array()) {
       }      
     
       // Zahlungstyp setzen
-      switch ($rechnungs_array['art_zahlung']) {
-        case 'PayPal':
-          $bill_node->field_bill_paymenttype[$bill_node->language][0]["value"] = $language == 'de' ? 'PayPal' : 'PayPal';
-          break;        
-        
-        default:
-          
-          break;
-      }
+      $bill_node->field_bill_paymenttype[$bill_node->language][0]["value"] = utf8_encode($rechnungs_array['art_zahlung']);  
+      $bill_node->field_bill_paypal_id[$bill_node->language][0]["value"] = utf8_encode($rechnungs_array['paypal_id']);    
     
       // Node speichern
       if ($bill_node = node_submit($bill_node)) {
