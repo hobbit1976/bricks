@@ -35,7 +35,7 @@ function bricks_bill_crawler_node_presave($node) {
       $node->field_bill_items_total_price[$node->language][$key]['value'] = (string) ($node->field_bill_items_quantity[$node->language][$key]['value'] * $node->field_bill_items_unit_price[$node->language][$key]['value']);
       $total_sum = $total_sum + $node->field_bill_items_total_price[$node->language][$key]['value'];
     }
-    $node->field_grand_total[$node->language][$key]['value'] = $total_sum;
+    $node->field_grand_total[$node->language][0]['value'] = $total_sum;
   }
 }
 
@@ -970,7 +970,7 @@ function bricks_bill_crawler_import_ebay_csv() {
     // datensaetze zeilenweise einlesen
     while (($data = fgetcsv($ebay_csv, 0, ";")) !== FALSE) {
       // rechnungsnummer prüfen, ob es mehrere artikel gibt
-      if ($data[0] === $rechnungs_array['rechnungsnummer']) {
+      if (isset($rechnungs_array['rechnungsnummer']) && $data[0] === $rechnungs_array['rechnungsnummer']) {
         // artikel auslesen
         $artikel_array = array();
         $artikel_array['art_nr'] = $data[11];
@@ -982,7 +982,14 @@ function bricks_bill_crawler_import_ebay_csv() {
       else {
         // rechnung speichern
         if (isset($rechnungs_array['rechnungsnummer'])) {
-          var_dump($rechnungs_array);
+          // prüfen auf vorhandene Rechnung
+          $ebay_bill = bricks_bill_crawler_load_bill_nodes(date('y') . '-EB#' . $rechnungs_array['rechnungsnummer']);
+          if (!empty($ebay_bill)) {
+            drupal_set_message('Rechnung vorhanden');      
+          }
+          else {
+            bricks_bill_crawler_save_ebay_bill($rechnungs_array);
+          }
           // rechnungsarray neu anlegen
           $rechnungs_array = array();
         }
@@ -1008,7 +1015,125 @@ function bricks_bill_crawler_import_ebay_csv() {
         $rechnungs_array['art_zahlung'] = $data[21];        
       }
     }
+
+    // letzte rechnung speichern
+    if (isset($rechnungs_array['rechnungsnummer'])) {
+      // prüfen auf vorhandene Rechnung
+      $ebay_bill = bricks_bill_crawler_load_bill_nodes(date('y') . '-EB#' . $rechnungs_array['rechnungsnummer']);
+      if (!empty($ebay_bill)) {
+        drupal_set_message('Rechnung vorhanden');      
+      }
+      else {
+        bricks_bill_crawler_save_ebay_bill($rechnungs_array);
+      }
+      // rechnungsarray neu anlegen
+      $rechnungs_array = array();
+    }
     fclose($ebay_csv);
   }
   
+}
+
+/*
+ * ebay Rechnung speichern
+ */
+function bricks_bill_crawler_save_ebay_bill($rechnungs_array = array()) {
+  // Rechnungssprache festlegen
+  $language = 'en';
+  if ($rechnungs_array['land'] == 'Deutschland' || $rechnungs_array['land'] == 'Österreich') {
+    $language = 'de';
+  }
+      // Objekt anlegen
+      $bill_node = new stdClass();
+      // Typ festlegen
+      $bill_node->type = 'bill';
+      // default Werte setzen
+      node_object_prepare($bill_node);
+      // UID auf Admin setzen
+      $bill_node->uid = 1;
+      // nicht voröffentlichen
+      $bill_node->status = 0;
+      $bill_node->promote = 0;
+      // Sprache auf neutral setzen
+      $bill_node->language = LANGUAGE_NONE;
+      // OrderID als Titel setzen
+      $bill_node->title = date('y') . '-EB#' . $rechnungs_array['rechnungsnummer'];;
+      // Rechnungssprache setzen
+      $bill_node->field_bill_language[$bill_node->language][0]["value"] = $language;
+      // Rechnungsnummer setzen
+      $bill_node->field_bill_number[$bill_node->language][0]["value"] = date('y') . '-EB#' . $rechnungs_array['rechnungsnummer'];
+      // Rechnungsdatum setzen
+      $bill_node->field_bill_invoice_date[$bill_node->language][0]["value"] = date('d.m.Y');
+      // Lieferdatum setzen
+      $bill_node->field_bill_delivery_date[$bill_node->language][0]["value"] = date('d.m.Y');  
+      // Zahlungsziel setzen
+      $bill_node->field_bill_term_of_payment[$bill_node->language][0]["value"] = $language == 'de' ? 'sofort fällig' : 'immediately due and payable';
+      // Anrede setzen
+      $bill_node->field_bill_salutation[$bill_node->language][0]["value"] = $rechnungs_array['name'];
+      // Adresse setzen
+      $bill_node->field_bill_address[$bill_node->language][0]["value"] = utf8_encode($rechnungs_array['name']) . '<br />' .  utf8_encode($rechnungs_array['addresse_1']) . '<br />' . utf8_encode($rechnungs_array['addresse_2']) . '<br />' . utf8_encode($rechnungs_array['plz']) . ' ' . utf8_encode($rechnungs_array['ort']) . '<br />' . utf8_encode($rechnungs_array['land']);
+      // Herkunftsland setzen
+      $bill_node->field_bill_country[$bill_node->language][0]["value"] = $rechnungs_array['land']; 
+      // E-Mail setzen
+      //$bill_node->field_bill_e_mail[$bill_node->language][0]["value"] = '';
+      // Anmerkung setzen
+      //$bill_node->field_bill_orderremarks[$bill_node->language][0]["value"] = '';
+      // PDF-Erzeugung setzen
+      $bill_node->field_bill_check_pdf[$bill_node->language][0]["value"] = 0;
+      // Mail versenden
+      $bill_node->field_bill_check_mail[$bill_node->language][0]["value"] = 0;
+      // MwSt.
+      $bill_node->field_add_vat[$bill_node->language][0]["value"] = $rechnungs_array['art_mwst'] == '19%' ? 1 : 0;
+      // 'Rechnung von' setzen
+      $bill_node->field_bill_from[$bill_node->language][0]["value"] = 'ebay'; 
+      // Order Items setzen
+      $item_numbers = 1;
+      $number_items = 0;  
+      $sum_items = 0.000;
+
+      foreach ($rechnungs_array['artikel'] as $key => $value) {
+        // extra items
+        if (!empty($value['art_nr'])) {
+          $number_items++;
+          $bill_node->field_bill_items_item[$bill_node->language][]["value"] = $item_numbers;
+          $bill_node->field_bill_items_number[$bill_node->language][]["value"] = $value['art_nr'];
+          $bill_node->field_bill_items_description[$bill_node->language][]["value"] = utf8_encode($value['art_bezeichnung']);
+          $bill_node->field_bill_items_quantity[$bill_node->language][]["value"] = $value['art_stueckzahl'];
+          $bill_node->field_bill_items_unit_price[$bill_node->language][]["value"] = str_replace(',', '.', str_replace('EUR ', '', $value['art_preis']));          
+   //       $bill_node->field_bill_items_total_price[$bill_node->language][]["value"] = $value['art_stueckzahl'] * str_replace(',', '.', str_replace('EUR ', '', $value['art_preis']));
+          $item_numbers++;
+        }
+      }
+ 
+      // Versand setzen 
+      $bill_node->field_shipping_packaging[$bill_node->language][0]["value"] = str_replace(',', '.', str_replace('EUR ', '', $rechnungs_array['art_versand'])); 
+      
+//      $bill_node->field_sub_total[$node->language][0]["value"] = $node->field_basegrandtotal[$node->language][0]["value"];
+//      $bill_node->field_grand_total[$node->language][0]["value"] = $node->field_basegrandtotal[$node->language][0]["value"];
+     
+    
+      if (!empty($rechnungs_array['art_versand']) && $rechnungs_array['art_versand'] > 0) {             
+        $bill_node->field_bill_items_item[$bill_node->language][]["value"] = $item_numbers;
+        $bill_node->field_bill_items_number[$bill_node->language][]["value"] = $language == 'de' ? 'V' : 'S';
+        $bill_node->field_bill_items_description[$bill_node->language][]["value"] = $language == 'de' ? 'Verpackung & Versand' : 'Shipping & Packaging';
+        $bill_node->field_bill_items_quantity[$bill_node->language][]["value"] = 1;
+        $bill_node->field_bill_items_unit_price[$bill_node->language][]["value"] = str_replace(',', '.', str_replace('EUR ', '', $rechnungs_array['art_versand']));
+        $item_numbers++;        
+      }      
+    
+      // Zahlungstyp setzen
+      switch ($rechnungs_array['art_zahlung']) {
+        case 'PayPal':
+          $bill_node->field_bill_paymenttype[$bill_node->language][0]["value"] = $language == 'de' ? 'PayPal' : 'PayPal';
+          break;        
+        
+        default:
+          
+          break;
+      }
+    
+      // Node speichern
+      if ($bill_node = node_submit($bill_node)) {
+        node_save($bill_node);      
+      }	
 }
