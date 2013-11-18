@@ -364,6 +364,7 @@ function bricks_bill_crawler_start_crawler_test() {
   //$test_node = node_load(368);
   //bricks_bill_crawler_save_datev_export($test_node);
   //bricks_bill_crawler_create_all_datev_node();
+  bricks_bill_crawler_import_ebay_csv();
 } 
 
 /*
@@ -954,4 +955,60 @@ function bricks_bill_crawler_check_eu($country) {
   );
   
   return in_array($country, $eu_country_array);
+}
+
+/*
+ * import ebay csv
+ */ 
+function bricks_bill_crawler_import_ebay_csv() {
+  // csv datei einlesen
+  $ebay_csv = fopen(variable_get('file_public_path') . '/feeds/ebay.csv', 'r');
+  
+  if ($ebay_csv !== FALSE) {
+    // rechnungsarray anlegen
+    $rechnungs_array = array();
+    // datensaetze zeilenweise einlesen
+    while (($data = fgetcsv($ebay_csv, 0, ";")) !== FALSE) {
+      // rechnungsnummer prüfen, ob es mehrere artikel gibt
+      if ($data[0] === $rechnungs_array['rechnungsnummer']) {
+        // artikel auslesen
+        $artikel_array = array();
+        $artikel_array['art_nr'] = $data[11];
+        $artikel_array['art_bezeichnung'] = $data[12];
+        $artikel_array['art_stueckzahl'] = $data[14];
+        $artikel_array['art_preis'] = $data[15];     
+        $rechnungs_array['artikel'][] = $artikel_array;         
+      }
+      else {
+        // rechnung speichern
+        if (isset($rechnungs_array['rechnungsnummer'])) {
+          var_dump($rechnungs_array);
+          // rechnungsarray neu anlegen
+          $rechnungs_array = array();
+        }
+        // rechnungsdaten auslesen
+        $rechnungs_array['rechnungsnummer'] = $data[0];
+        $rechnungs_array['name'] = $data[2];
+        $rechnungs_array['addresse_1'] = $data[5];
+        $rechnungs_array['addresse_2'] = $data[6];
+        $rechnungs_array['plz'] = $data[9];
+        $rechnungs_array['ort'] = $data[7];        
+        $rechnungs_array['region'] = $data[8];
+        $rechnungs_array['land'] = $data[10];
+        // artikel auslesen
+        $artikel_array = array();
+        $artikel_array['art_nr'] = $data[11];
+        $artikel_array['art_bezeichnung'] = $data[12];
+        $artikel_array['art_stueckzahl'] = $data[14];
+        $artikel_array['art_preis'] = $data[15];     
+        $rechnungs_array['artikel'][] = $artikel_array;        
+        
+        $rechnungs_array['art_mwst'] = $data[16];
+        $rechnungs_array['art_versand'] = $data[17];
+        $rechnungs_array['art_zahlung'] = $data[21];        
+      }
+    }
+    fclose($ebay_csv);
+  }
+  
 }
