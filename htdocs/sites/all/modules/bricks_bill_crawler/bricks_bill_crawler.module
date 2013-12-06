@@ -1037,7 +1037,7 @@ function bricks_bill_crawler_check_ebay_eu($country) {
  */ 
 function bricks_bill_crawler_import_ebay_csv() {
   // csv datei einlesen
-  $ebay_csv = fopen(variable_get('file_public_path') . '/feeds/ebay.csv', 'r');
+  $ebay_csv = fopen(variable_get('file_public_path') . '/feeds/SalesHistory.csv', 'r');
   
   if ($ebay_csv !== FALSE) {
     // rechnungsarray anlegen
