@@ -263,6 +263,18 @@ function bricks_bill_crawler_menu() {
     'title' => 'Import ebay csv',
     'page callback' => 'bricks_bill_crawler_import_ebay_csv',
     'access arguments' => array('access content overview'),
+  );    
+  
+  $items['bill_crawler_finance_overview'] = array(
+    'title' => 'Finance Overview',
+    'page callback' => 'bricks_bill_crawler_finance_overview',
+    'access arguments' => array('access content overview'),
+  );
+  
+  $items['bill_crawler_finance_month_overview'] = array(
+    'title' => 'Finance Overview',
+    'page callback' => 'bricks_bill_crawler_finance_month_overview',
+    'access arguments' => array('access content overview'),
   );
   
 //  $items['admin/bill_crawler/startcrawler'] = array(
@@ -1204,4 +1216,696 @@ function bricks_bill_crawler_save_ebay_bill($rechnungs_array = array()) {
       if ($bill_node = node_submit($bill_node)) {
         node_save($bill_node);      
       }	
+}
+
+function bricks_bill_crawler_finance_overview() {
+  $output = '';
+  
+  $rows = array();
+
+  $header = array(t('Monat'), t('Bruttoumsatz'), t('Nettoumsatz'));
+  
+  // alle Monate auslesen mit Bruttoumsatz
+  $result = db_query("SELECT STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y') as date, 
+                      YEAR(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) as year, 
+                      MONTH(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) as month, 
+                      MONTHNAME(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) as monthname, 
+                      SUM(p.field_bill_items_total_price_value) as brutto 
+                      FROM field_data_field_bill_invoice_date d 
+                      JOIN field_data_field_bill_items_number n  USING(`entity_id`)
+                      JOIN field_data_field_bill_items_total_price p USING(entity_id)
+                      LEFT JOIN field_data_field_bill_cancel c USING(entity_id)
+                      JOIN field_data_field_bill_check_mail mail USING(entity_id)
+                      JOIN field_data_field_bill_check_pdf pdf USING(entity_id)
+                      WHERE (c.field_bill_cancel_value = 0 OR c.field_bill_cancel_value IS NULL)
+                      AND mail.field_bill_check_mail_value = 1
+                      AND pdf.field_bill_check_pdf_value = 1
+                      AND n.delta = p.delta
+                      GROUP BY YEAR(date), MONTH(date) 
+                      ORDER BY YEAR(date), MONTH(date)");
+  foreach ($result as $record) {
+    // Versandkosten je Monat für Nettoumsatz
+    $result_versand = db_query("SELECT SUM(p.field_bill_items_total_price_value) as price
+                                FROM field_data_field_bill_invoice_date d 
+                                JOIN field_data_field_bill_items_number n  USING(`entity_id`)
+                                JOIN field_data_field_bill_items_total_price p USING(entity_id)
+                                LEFT JOIN field_data_field_bill_cancel c USING(entity_id)
+                                JOIN field_data_field_bill_check_mail mail USING(entity_id)
+                                JOIN field_data_field_bill_check_pdf pdf USING(entity_id)
+                                WHERE YEAR(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) = :y 
+                                AND MONTH(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) = :m
+                                AND (c.field_bill_cancel_value = 0 OR c.field_bill_cancel_value IS NULL)
+                                AND mail.field_bill_check_mail_value = 1
+                                AND pdf.field_bill_check_pdf_value = 1
+                                AND n.delta = p.delta
+                                AND n.field_bill_items_number_value IN('V','S')", array(':y' => $record->year, ':m' => $record->month));
+    $sum_versand = $result_versand->fetchAssoc();
+    $row = array();
+    $row[] = array('data' => l($record->monthname . ' - ' . $record->year, 'bill_crawler_finance_month_overview/' . $record->month . '/' . $record->year));    
+    $row[] = array('data' => number_format($record->brutto, 2, ',', '.') . '€'); 
+    $row[] = array('data' => number_format($record->brutto-$sum_versand['price'], 2, ',', '.') . '€'); 
+    $rows[] = $row;
+  }
+  
+  $output .= theme('table', array('header' => $header, 'rows' => $rows, 'attributes' => array()));
+  
+  return $output;
+}
+
+function bricks_bill_crawler_finance_month_overview() {
+  // Jahr und Monat ermitteln
+  $month = arg(1);
+  $year = arg(2);
+  
+  drupal_set_title('Finance Overview ' . $month . '-' . $year);
+  
+  $output = '';
+  
+  $rows = array();
+
+  $header = array('', t('GER'), t('EU'), t('World'), t('Gesamt BL'), t('ebay'), t('andere'), t('Gesamt alle'));
+  
+  // Bruttoumsatz ermitteln
+  $row = array();
+  $row[] = array('data' => t('Bruttoumsatz'));
+  // Germany  
+  $result = db_query("SELECT SUM(p.field_bill_items_total_price_value) as sum
+                      FROM field_data_field_bill_invoice_date d 
+                      JOIN field_data_field_bill_items_number n  USING(`entity_id`)
+                      JOIN field_data_field_bill_items_total_price p USING(entity_id)
+                      LEFT JOIN field_data_field_bill_cancel c USING(entity_id)
+                      JOIN field_data_field_bill_check_mail mail USING(entity_id)
+                      JOIN field_data_field_bill_check_pdf pdf USING(entity_id)
+                      JOIN field_data_field_bill_country country USING(entity_id)
+                      LEFT JOIN field_data_field_bill_from fr USING(entity_id)
+                      WHERE YEAR(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) = :y 
+                      AND MONTH(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) = :m
+                      AND (c.field_bill_cancel_value = 0 OR c.field_bill_cancel_value IS NULL)
+                      AND mail.field_bill_check_mail_value = 1
+                      AND pdf.field_bill_check_pdf_value = 1
+                      AND country.field_bill_country_value IN(:c)
+                      AND (fr.field_bill_from_value IN('BrickLink','BrickLinks') OR fr.field_bill_from_value IS NULL)
+                      AND n.delta = p.delta", array(':y' => $year, ':m' => $month, ':c' => 'Germany'));
+  
+  $sum = $result->fetchAssoc();
+  $row[] = array('data' => number_format($sum['sum'], 2, ',', '.') . '€'); 
+  // EU
+  $result = db_query("SELECT SUM(p.field_bill_items_total_price_value) as sum
+                      FROM field_data_field_bill_invoice_date d 
+                      JOIN field_data_field_bill_items_number n  USING(`entity_id`)
+                      JOIN field_data_field_bill_items_total_price p USING(entity_id)
+                      LEFT JOIN field_data_field_bill_cancel c USING(entity_id)
+                      JOIN field_data_field_bill_check_mail mail USING(entity_id)
+                      JOIN field_data_field_bill_check_pdf pdf USING(entity_id)
+                      JOIN field_data_field_bill_country country USING(entity_id)
+                      LEFT JOIN field_data_field_bill_from fr USING(entity_id)
+                      WHERE YEAR(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) = :y 
+                      AND MONTH(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) = :m
+                      AND (c.field_bill_cancel_value = 0 OR c.field_bill_cancel_value IS NULL)
+                      AND mail.field_bill_check_mail_value = 1
+                      AND pdf.field_bill_check_pdf_value = 1
+                      AND (fr.field_bill_from_value IN('BrickLink','BrickLinks') OR fr.field_bill_from_value IS NULL)
+                      AND country.field_bill_country_value IN('" . implode("','", bricks_bill_crawler_get_eu_array()) . "')
+                      AND n.delta = p.delta", array(':y' => $year, ':m' => $month));
+
+  $sum = $result->fetchAssoc();  
+  $row[] = array('data' => number_format($sum['sum'], 2, ',', '.') . '€'); 
+  // World
+  $result = db_query("SELECT SUM(p.field_bill_items_total_price_value) as sum
+                      FROM field_data_field_bill_invoice_date d 
+                      JOIN field_data_field_bill_items_number n  USING(`entity_id`)
+                      JOIN field_data_field_bill_items_total_price p USING(entity_id)
+                      LEFT JOIN field_data_field_bill_cancel c USING(entity_id)
+                      JOIN field_data_field_bill_check_mail mail USING(entity_id)
+                      JOIN field_data_field_bill_check_pdf pdf USING(entity_id)
+                      JOIN field_data_field_bill_country country USING(entity_id)
+                      LEFT JOIN field_data_field_bill_from fr USING(entity_id)
+                      WHERE YEAR(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) = :y 
+                      AND MONTH(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) = :m
+                      AND (c.field_bill_cancel_value = 0 OR c.field_bill_cancel_value IS NULL)
+                      AND mail.field_bill_check_mail_value = 1
+                      AND pdf.field_bill_check_pdf_value = 1
+                      AND (fr.field_bill_from_value IN('BrickLink','BrickLinks') OR fr.field_bill_from_value IS NULL)
+                      AND country.field_bill_country_value NOT IN('" . implode("','", bricks_bill_crawler_get_eu_array(true)) . "')
+                      AND n.delta = p.delta", array(':y' => $year, ':m' => $month));
+
+  $sum = $result->fetchAssoc();  
+  $row[] = array('data' => number_format($sum['sum'], 2, ',', '.') . '€'); 
+  // Gesamt
+  $result = db_query("SELECT SUM(p.field_bill_items_total_price_value) as sum
+                      FROM field_data_field_bill_invoice_date d 
+                      JOIN field_data_field_bill_items_number n  USING(`entity_id`)
+                      JOIN field_data_field_bill_items_total_price p USING(entity_id)
+                      LEFT JOIN field_data_field_bill_cancel c USING(entity_id)
+                      JOIN field_data_field_bill_check_mail mail USING(entity_id)
+                      JOIN field_data_field_bill_check_pdf pdf USING(entity_id)
+                      JOIN field_data_field_bill_country country USING(entity_id)
+                      LEFT JOIN field_data_field_bill_from fr USING(entity_id)
+                      WHERE YEAR(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) = :y 
+                      AND MONTH(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) = :m
+                      AND (c.field_bill_cancel_value = 0 OR c.field_bill_cancel_value IS NULL)
+                      AND mail.field_bill_check_mail_value = 1
+                      AND pdf.field_bill_check_pdf_value = 1
+                      AND (fr.field_bill_from_value IN('BrickLink','BrickLinks') OR fr.field_bill_from_value IS NULL)
+                      AND n.delta = p.delta", array(':y' => $year, ':m' => $month));
+
+  $sum = $result->fetchAssoc();  
+  $row[] = array('data' => number_format($sum['sum'], 2, ',', '.') . '€'); 
+  // ebay
+  $result = db_query("SELECT SUM(p.field_bill_items_total_price_value) as sum
+                      FROM field_data_field_bill_invoice_date d 
+                      JOIN field_data_field_bill_items_number n  USING(`entity_id`)
+                      JOIN field_data_field_bill_items_total_price p USING(entity_id)
+                      LEFT JOIN field_data_field_bill_cancel c USING(entity_id)
+                      JOIN field_data_field_bill_check_mail mail USING(entity_id)
+                      JOIN field_data_field_bill_check_pdf pdf USING(entity_id)
+                      JOIN field_data_field_bill_country country USING(entity_id)
+                      JOIN field_data_field_bill_from fr USING(entity_id)
+                      WHERE YEAR(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) = :y 
+                      AND MONTH(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) = :m
+                      AND (c.field_bill_cancel_value = 0 OR c.field_bill_cancel_value IS NULL)
+                      AND mail.field_bill_check_mail_value = 1
+                      AND pdf.field_bill_check_pdf_value = 1
+                      AND fr.field_bill_from_value IN('ebay')
+                      AND n.delta = p.delta", array(':y' => $year, ':m' => $month));
+
+  $sum = $result->fetchAssoc();  
+  $row[] = array('data' => number_format($sum['sum'], 2, ',', '.') . '€'); 
+  // andere
+  $result = db_query("SELECT SUM(p.field_bill_items_total_price_value) as sum
+                      FROM field_data_field_bill_invoice_date d 
+                      JOIN field_data_field_bill_items_number n  USING(`entity_id`)
+                      JOIN field_data_field_bill_items_total_price p USING(entity_id)
+                      LEFT JOIN field_data_field_bill_cancel c USING(entity_id)
+                      JOIN field_data_field_bill_check_mail mail USING(entity_id)
+                      JOIN field_data_field_bill_check_pdf pdf USING(entity_id)
+                      JOIN field_data_field_bill_country country USING(entity_id)
+                      LEFT JOIN field_data_field_bill_from fr USING(entity_id)
+                      WHERE YEAR(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) = :y 
+                      AND MONTH(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) = :m
+                      AND (c.field_bill_cancel_value = 0 OR c.field_bill_cancel_value IS NULL)
+                      AND mail.field_bill_check_mail_value = 1
+                      AND pdf.field_bill_check_pdf_value = 1
+                      AND fr.field_bill_from_value NOT IN('ebay','BrickLink','BrickLinks')
+                      AND n.delta = p.delta", array(':y' => $year, ':m' => $month));
+
+  $sum = $result->fetchAssoc();  
+  $row[] = array('data' => number_format($sum['sum'], 2, ',', '.') . '€'); 
+  // Gesamt alle
+  $result = db_query("SELECT SUM(p.field_bill_items_total_price_value) as sum
+                      FROM field_data_field_bill_invoice_date d 
+                      JOIN field_data_field_bill_items_number n  USING(`entity_id`)
+                      JOIN field_data_field_bill_items_total_price p USING(entity_id)
+                      LEFT JOIN field_data_field_bill_cancel c USING(entity_id)
+                      JOIN field_data_field_bill_check_mail mail USING(entity_id)
+                      JOIN field_data_field_bill_check_pdf pdf USING(entity_id)
+                      JOIN field_data_field_bill_country country USING(entity_id)
+                      LEFT JOIN field_data_field_bill_from fr USING(entity_id)
+                      WHERE YEAR(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) = :y 
+                      AND MONTH(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) = :m
+                      AND (c.field_bill_cancel_value = 0 OR c.field_bill_cancel_value IS NULL)
+                      AND mail.field_bill_check_mail_value = 1
+                      AND pdf.field_bill_check_pdf_value = 1
+                      AND n.delta = p.delta", array(':y' => $year, ':m' => $month));
+
+  $sum = $result->fetchAssoc();  
+  $row[] = array('data' => number_format($sum['sum'], 2, ',', '.') . '€');   
+  
+  $rows[] = $row;  
+  
+  // Versandkosten ermitteln
+  $row = array();
+  $row[] = array('data' => t('Versandkosten'));
+  // Germany  
+  $result = db_query("SELECT SUM(p.field_bill_items_total_price_value) as sum
+                      FROM field_data_field_bill_invoice_date d 
+                      JOIN field_data_field_bill_items_number n  USING(`entity_id`)
+                      JOIN field_data_field_bill_items_total_price p USING(entity_id)
+                      LEFT JOIN field_data_field_bill_cancel c USING(entity_id)
+                      JOIN field_data_field_bill_check_mail mail USING(entity_id)
+                      JOIN field_data_field_bill_check_pdf pdf USING(entity_id)
+                      JOIN field_data_field_bill_country country USING(entity_id)
+                      LEFT JOIN field_data_field_bill_from fr USING(entity_id)
+                      WHERE YEAR(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) = :y 
+                      AND MONTH(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) = :m
+                      AND (c.field_bill_cancel_value = 0 OR c.field_bill_cancel_value IS NULL)
+                      AND mail.field_bill_check_mail_value = 1
+                      AND pdf.field_bill_check_pdf_value = 1
+                      AND country.field_bill_country_value IN(:c)
+                      AND (fr.field_bill_from_value IN('BrickLink','BrickLinks') OR fr.field_bill_from_value IS NULL)
+                      AND n.field_bill_items_number_value IN('V','S')
+                      AND n.delta = p.delta", array(':y' => $year, ':m' => $month, ':c' => 'Germany'));
+  
+  $sum = $result->fetchAssoc();
+  $row[] = array('data' => number_format($sum['sum'], 2, ',', '.') . '€'); 
+  // EU
+  $result = db_query("SELECT SUM(p.field_bill_items_total_price_value) as sum
+                      FROM field_data_field_bill_invoice_date d 
+                      JOIN field_data_field_bill_items_number n  USING(`entity_id`)
+                      JOIN field_data_field_bill_items_total_price p USING(entity_id)
+                      LEFT JOIN field_data_field_bill_cancel c USING(entity_id)
+                      JOIN field_data_field_bill_check_mail mail USING(entity_id)
+                      JOIN field_data_field_bill_check_pdf pdf USING(entity_id)
+                      JOIN field_data_field_bill_country country USING(entity_id)
+                      LEFT JOIN field_data_field_bill_from fr USING(entity_id)
+                      WHERE YEAR(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) = :y 
+                      AND MONTH(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) = :m
+                      AND (c.field_bill_cancel_value = 0 OR c.field_bill_cancel_value IS NULL)
+                      AND mail.field_bill_check_mail_value = 1
+                      AND pdf.field_bill_check_pdf_value = 1
+                      AND (fr.field_bill_from_value IN('BrickLink','BrickLinks') OR fr.field_bill_from_value IS NULL)
+                      AND n.field_bill_items_number_value IN('V','S')
+                      AND country.field_bill_country_value IN('" . implode("','", bricks_bill_crawler_get_eu_array()) . "')
+                      AND n.delta = p.delta", array(':y' => $year, ':m' => $month));
+
+  $sum = $result->fetchAssoc();  
+  $row[] = array('data' => number_format($sum['sum'], 2, ',', '.') . '€'); 
+  // World
+  $result = db_query("SELECT SUM(p.field_bill_items_total_price_value) as sum
+                      FROM field_data_field_bill_invoice_date d 
+                      JOIN field_data_field_bill_items_number n  USING(`entity_id`)
+                      JOIN field_data_field_bill_items_total_price p USING(entity_id)
+                      LEFT JOIN field_data_field_bill_cancel c USING(entity_id)
+                      JOIN field_data_field_bill_check_mail mail USING(entity_id)
+                      JOIN field_data_field_bill_check_pdf pdf USING(entity_id)
+                      JOIN field_data_field_bill_country country USING(entity_id)
+                      LEFT JOIN field_data_field_bill_from fr USING(entity_id)
+                      WHERE YEAR(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) = :y 
+                      AND MONTH(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) = :m
+                      AND (c.field_bill_cancel_value = 0 OR c.field_bill_cancel_value IS NULL)
+                      AND mail.field_bill_check_mail_value = 1
+                      AND pdf.field_bill_check_pdf_value = 1
+                      AND (fr.field_bill_from_value IN('BrickLink','BrickLinks') OR fr.field_bill_from_value IS NULL)
+                      AND n.field_bill_items_number_value IN('V','S')
+                      AND country.field_bill_country_value NOT IN('" . implode("','", bricks_bill_crawler_get_eu_array(true)) . "')
+                      AND n.delta = p.delta", array(':y' => $year, ':m' => $month));
+
+  $sum = $result->fetchAssoc();  
+  $row[] = array('data' => number_format($sum['sum'], 2, ',', '.') . '€'); 
+  // Gesamt
+  $result = db_query("SELECT SUM(p.field_bill_items_total_price_value) as sum
+                      FROM field_data_field_bill_invoice_date d 
+                      JOIN field_data_field_bill_items_number n  USING(`entity_id`)
+                      JOIN field_data_field_bill_items_total_price p USING(entity_id)
+                      LEFT JOIN field_data_field_bill_cancel c USING(entity_id)
+                      JOIN field_data_field_bill_check_mail mail USING(entity_id)
+                      JOIN field_data_field_bill_check_pdf pdf USING(entity_id)
+                      JOIN field_data_field_bill_country country USING(entity_id)
+                      LEFT JOIN field_data_field_bill_from fr USING(entity_id)
+                      WHERE YEAR(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) = :y 
+                      AND MONTH(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) = :m
+                      AND (c.field_bill_cancel_value = 0 OR c.field_bill_cancel_value IS NULL)
+                      AND mail.field_bill_check_mail_value = 1
+                      AND pdf.field_bill_check_pdf_value = 1
+                      AND (fr.field_bill_from_value IN('BrickLink','BrickLinks') OR fr.field_bill_from_value IS NULL)
+                      AND n.field_bill_items_number_value IN('V','S')
+                      AND n.delta = p.delta", array(':y' => $year, ':m' => $month));
+
+  $sum = $result->fetchAssoc();  
+  $row[] = array('data' => number_format($sum['sum'], 2, ',', '.') . '€'); 
+  // ebay
+  $result = db_query("SELECT SUM(p.field_bill_items_total_price_value) as sum
+                      FROM field_data_field_bill_invoice_date d 
+                      JOIN field_data_field_bill_items_number n  USING(`entity_id`)
+                      JOIN field_data_field_bill_items_total_price p USING(entity_id)
+                      LEFT JOIN field_data_field_bill_cancel c USING(entity_id)
+                      JOIN field_data_field_bill_check_mail mail USING(entity_id)
+                      JOIN field_data_field_bill_check_pdf pdf USING(entity_id)
+                      JOIN field_data_field_bill_country country USING(entity_id)
+                      LEFT JOIN field_data_field_bill_from fr USING(entity_id)
+                      WHERE YEAR(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) = :y 
+                      AND MONTH(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) = :m
+                      AND (c.field_bill_cancel_value = 0 OR c.field_bill_cancel_value IS NULL)
+                      AND mail.field_bill_check_mail_value = 1
+                      AND pdf.field_bill_check_pdf_value = 1
+                      AND fr.field_bill_from_value IN('ebay')
+                      AND n.field_bill_items_number_value IN('V','S')
+                      AND n.delta = p.delta", array(':y' => $year, ':m' => $month));
+
+  $sum = $result->fetchAssoc();  
+  $row[] = array('data' => number_format($sum['sum'], 2, ',', '.') . '€'); 
+  // andere
+  $result = db_query("SELECT SUM(p.field_bill_items_total_price_value) as sum
+                      FROM field_data_field_bill_invoice_date d 
+                      JOIN field_data_field_bill_items_number n  USING(`entity_id`)
+                      JOIN field_data_field_bill_items_total_price p USING(entity_id)
+                      LEFT JOIN field_data_field_bill_cancel c USING(entity_id)
+                      JOIN field_data_field_bill_check_mail mail USING(entity_id)
+                      JOIN field_data_field_bill_check_pdf pdf USING(entity_id)
+                      JOIN field_data_field_bill_country country USING(entity_id)
+                      LEFT JOIN field_data_field_bill_from fr USING(entity_id)
+                      WHERE YEAR(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) = :y 
+                      AND MONTH(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) = :m
+                      AND (c.field_bill_cancel_value = 0 OR c.field_bill_cancel_value IS NULL)
+                      AND mail.field_bill_check_mail_value = 1
+                      AND pdf.field_bill_check_pdf_value = 1
+                      AND fr.field_bill_from_value NOT IN('ebay','BrickLink','BrickLinks')
+                      AND n.field_bill_items_number_value IN('V','S')
+                      AND n.delta = p.delta", array(':y' => $year, ':m' => $month));
+
+  $sum = $result->fetchAssoc();  
+  $row[] = array('data' => number_format($sum['sum'], 2, ',', '.') . '€'); 
+  // Gesamt alle
+  $result = db_query("SELECT SUM(p.field_bill_items_total_price_value) as sum
+                      FROM field_data_field_bill_invoice_date d 
+                      JOIN field_data_field_bill_items_number n  USING(`entity_id`)
+                      JOIN field_data_field_bill_items_total_price p USING(entity_id)
+                      LEFT JOIN field_data_field_bill_cancel c USING(entity_id)
+                      JOIN field_data_field_bill_check_mail mail USING(entity_id)
+                      JOIN field_data_field_bill_check_pdf pdf USING(entity_id)
+                      JOIN field_data_field_bill_country country USING(entity_id)
+                      LEFT JOIN field_data_field_bill_from fr USING(entity_id)
+                      WHERE YEAR(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) = :y 
+                      AND MONTH(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) = :m
+                      AND (c.field_bill_cancel_value = 0 OR c.field_bill_cancel_value IS NULL)
+                      AND mail.field_bill_check_mail_value = 1
+                      AND pdf.field_bill_check_pdf_value = 1
+                      AND n.field_bill_items_number_value IN('V','S')
+                      AND n.delta = p.delta", array(':y' => $year, ':m' => $month));
+
+  $sum = $result->fetchAssoc();  
+  $row[] = array('data' => number_format($sum['sum'], 2, ',', '.') . '€');   
+  
+  $rows[] = $row;
+  
+  // Nettoumsatz ermitteln
+  $row = array();
+  $row_orders = array();
+  $row_orders[] = array('data' => t('Orders'));
+  $row[] = array('data' => t('Nettoumsatz'));
+  // Germany  
+  $result = db_query("SELECT SUM(p.field_bill_items_total_price_value) as sum,
+                      COUNT(DISTINCT(d.entity_id)) as count
+                      FROM field_data_field_bill_invoice_date d 
+                      JOIN field_data_field_bill_items_number n  USING(`entity_id`)
+                      JOIN field_data_field_bill_items_total_price p USING(entity_id)
+                      LEFT JOIN field_data_field_bill_cancel c USING(entity_id)
+                      JOIN field_data_field_bill_check_mail mail USING(entity_id)
+                      JOIN field_data_field_bill_check_pdf pdf USING(entity_id)
+                      JOIN field_data_field_bill_country country USING(entity_id)
+                      LEFT JOIN field_data_field_bill_from fr USING(entity_id)
+                      WHERE YEAR(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) = :y 
+                      AND MONTH(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) = :m
+                      AND (c.field_bill_cancel_value = 0 OR c.field_bill_cancel_value IS NULL)
+                      AND mail.field_bill_check_mail_value = 1
+                      AND pdf.field_bill_check_pdf_value = 1
+                      AND country.field_bill_country_value IN(:c)
+                      AND (fr.field_bill_from_value IN('BrickLink','BrickLinks') OR fr.field_bill_from_value IS NULL)
+                      AND n.field_bill_items_number_value NOT IN('V','S')
+                      AND n.delta = p.delta", array(':y' => $year, ':m' => $month, ':c' => 'Germany'));
+  
+  $sum = $result->fetchAssoc();
+  $row[] = array('data' => number_format($sum['sum'], 2, ',', '.') . '€');
+  $row_orders[] = array('data' => $sum['count']); 
+  // EU
+  $result = db_query("SELECT SUM(p.field_bill_items_total_price_value) as sum,
+                      COUNT(DISTINCT(d.entity_id)) as count
+                      FROM field_data_field_bill_invoice_date d 
+                      JOIN field_data_field_bill_items_number n  USING(`entity_id`)
+                      JOIN field_data_field_bill_items_total_price p USING(entity_id)
+                      LEFT JOIN field_data_field_bill_cancel c USING(entity_id)
+                      JOIN field_data_field_bill_check_mail mail USING(entity_id)
+                      JOIN field_data_field_bill_check_pdf pdf USING(entity_id)
+                      JOIN field_data_field_bill_country country USING(entity_id)
+                      LEFT JOIN field_data_field_bill_from fr USING(entity_id)
+                      WHERE YEAR(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) = :y 
+                      AND MONTH(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) = :m
+                      AND (c.field_bill_cancel_value = 0 OR c.field_bill_cancel_value IS NULL)
+                      AND mail.field_bill_check_mail_value = 1
+                      AND pdf.field_bill_check_pdf_value = 1
+                      AND (fr.field_bill_from_value IN('BrickLink','BrickLinks') OR fr.field_bill_from_value IS NULL)
+                      AND n.field_bill_items_number_value NOT IN('V','S')
+                      AND country.field_bill_country_value IN('" . implode("','", bricks_bill_crawler_get_eu_array()) . "')
+                      AND n.delta = p.delta", array(':y' => $year, ':m' => $month));
+
+  $sum = $result->fetchAssoc();  
+  $row[] = array('data' => number_format($sum['sum'], 2, ',', '.') . '€');
+  $row_orders[] = array('data' => $sum['count']); 
+  // World
+  $result = db_query("SELECT SUM(p.field_bill_items_total_price_value) as sum,
+                      COUNT(DISTINCT(d.entity_id)) as count
+                      FROM field_data_field_bill_invoice_date d 
+                      JOIN field_data_field_bill_items_number n  USING(`entity_id`)
+                      JOIN field_data_field_bill_items_total_price p USING(entity_id)
+                      LEFT JOIN field_data_field_bill_cancel c USING(entity_id)
+                      JOIN field_data_field_bill_check_mail mail USING(entity_id)
+                      JOIN field_data_field_bill_check_pdf pdf USING(entity_id)
+                      JOIN field_data_field_bill_country country USING(entity_id)
+                      LEFT JOIN field_data_field_bill_from fr USING(entity_id)
+                      WHERE YEAR(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) = :y 
+                      AND MONTH(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) = :m
+                      AND (c.field_bill_cancel_value = 0 OR c.field_bill_cancel_value IS NULL)
+                      AND mail.field_bill_check_mail_value = 1
+                      AND pdf.field_bill_check_pdf_value = 1
+                      AND (fr.field_bill_from_value IN('BrickLink','BrickLinks') OR fr.field_bill_from_value IS NULL)
+                      AND n.field_bill_items_number_value NOT IN('V','S')
+                      AND country.field_bill_country_value NOT IN('" . implode("','", bricks_bill_crawler_get_eu_array(true)) . "')
+                      AND n.delta = p.delta", array(':y' => $year, ':m' => $month));
+
+  $sum = $result->fetchAssoc();  
+  $row[] = array('data' => number_format($sum['sum'], 2, ',', '.') . '€');
+  $row_orders[] = array('data' => $sum['count']);    
+  // Gesamt
+  $result = db_query("SELECT SUM(p.field_bill_items_total_price_value) as sum,
+                      COUNT(DISTINCT(d.entity_id)) as count
+                      FROM field_data_field_bill_invoice_date d 
+                      JOIN field_data_field_bill_items_number n  USING(`entity_id`)
+                      JOIN field_data_field_bill_items_total_price p USING(entity_id)
+                      Left JOIN field_data_field_bill_cancel c USING(entity_id)
+                      JOIN field_data_field_bill_check_mail mail USING(entity_id)
+                      JOIN field_data_field_bill_check_pdf pdf USING(entity_id)
+                      JOIN field_data_field_bill_country country USING(entity_id)
+                      LEFT JOIN field_data_field_bill_from fr USING(entity_id)
+                      WHERE YEAR(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) = :y 
+                      AND MONTH(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) = :m
+                      AND (c.field_bill_cancel_value = 0 OR c.field_bill_cancel_value IS NULL)
+                      AND mail.field_bill_check_mail_value = 1
+                      AND pdf.field_bill_check_pdf_value = 1
+                      AND (fr.field_bill_from_value IN('BrickLink','BrickLinks') OR fr.field_bill_from_value IS NULL)
+                      AND n.field_bill_items_number_value NOT IN('V','S')
+                      AND n.delta = p.delta", array(':y' => $year, ':m' => $month));
+
+  $sum = $result->fetchAssoc();  
+  $row[] = array('data' => number_format($sum['sum'], 2, ',', '.') . '€'); 
+  $row_orders[] = array('data' => $sum['count']);    
+  // ebay
+  $result = db_query("SELECT SUM(p.field_bill_items_total_price_value) as sum,
+                      COUNT(DISTINCT(d.entity_id)) as count
+                      FROM field_data_field_bill_invoice_date d 
+                      JOIN field_data_field_bill_items_number n  USING(`entity_id`)
+                      JOIN field_data_field_bill_items_total_price p USING(entity_id)
+                      LEFT JOIN field_data_field_bill_cancel c USING(entity_id)
+                      JOIN field_data_field_bill_check_mail mail USING(entity_id)
+                      JOIN field_data_field_bill_check_pdf pdf USING(entity_id)
+                      JOIN field_data_field_bill_country country USING(entity_id)
+                      LEFT JOIN field_data_field_bill_from fr USING(entity_id)
+                      WHERE YEAR(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) = :y 
+                      AND MONTH(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) = :m
+                      AND (c.field_bill_cancel_value = 0 OR c.field_bill_cancel_value IS NULL)
+                      AND mail.field_bill_check_mail_value = 1
+                      AND pdf.field_bill_check_pdf_value = 1
+                      AND fr.field_bill_from_value IN('ebay')
+                      AND n.field_bill_items_number_value NOT IN('V','S')
+                      AND n.delta = p.delta", array(':y' => $year, ':m' => $month));
+
+  $sum = $result->fetchAssoc();  
+  $row[] = array('data' => number_format($sum['sum'], 2, ',', '.') . '€'); 
+  $row_orders[] = array('data' => $sum['count']);    
+  // andere
+  $result = db_query("SELECT SUM(p.field_bill_items_total_price_value) as sum,
+                      COUNT(DISTINCT(d.entity_id)) as count
+                      FROM field_data_field_bill_invoice_date d 
+                      JOIN field_data_field_bill_items_number n  USING(`entity_id`)
+                      JOIN field_data_field_bill_items_total_price p USING(entity_id)
+                      LEFT JOIN field_data_field_bill_cancel c USING(entity_id)
+                      JOIN field_data_field_bill_check_mail mail USING(entity_id)
+                      JOIN field_data_field_bill_check_pdf pdf USING(entity_id)
+                      JOIN field_data_field_bill_country country USING(entity_id)
+                      LEFT JOIN field_data_field_bill_from fr USING(entity_id)
+                      WHERE YEAR(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) = :y 
+                      AND MONTH(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) = :m
+                      AND (c.field_bill_cancel_value = 0 OR c.field_bill_cancel_value IS NULL)
+                      AND mail.field_bill_check_mail_value = 1
+                      AND pdf.field_bill_check_pdf_value = 1
+                      AND fr.field_bill_from_value NOT IN('ebay','BrickLink','BrickLinks')
+                      AND n.field_bill_items_number_value NOT IN('V','S')
+                      AND n.delta = p.delta", array(':y' => $year, ':m' => $month));
+
+  $sum = $result->fetchAssoc();  
+  $row[] = array('data' => number_format($sum['sum'], 2, ',', '.') . '€'); 
+  $row_orders[] = array('data' => $sum['count']);    
+  // Gesamt alle
+  $result = db_query("SELECT SUM(p.field_bill_items_total_price_value) as sum,
+                      COUNT(DISTINCT(d.entity_id)) as count
+                      FROM field_data_field_bill_invoice_date d 
+                      JOIN field_data_field_bill_items_number n  USING(`entity_id`)
+                      JOIN field_data_field_bill_items_total_price p USING(entity_id)
+                      LEFT JOIN field_data_field_bill_cancel c USING(entity_id)
+                      JOIN field_data_field_bill_check_mail mail USING(entity_id)
+                      JOIN field_data_field_bill_check_pdf pdf USING(entity_id)
+                      JOIN field_data_field_bill_country country USING(entity_id)
+                      LEFT JOIN field_data_field_bill_from fr USING(entity_id)
+                      WHERE YEAR(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) = :y 
+                      AND MONTH(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) = :m
+                      AND (c.field_bill_cancel_value = 0 OR c.field_bill_cancel_value IS NULL)
+                      AND mail.field_bill_check_mail_value = 1
+                      AND pdf.field_bill_check_pdf_value = 1
+                      AND n.field_bill_items_number_value NOT IN('V','S')
+                      AND n.delta = p.delta", array(':y' => $year, ':m' => $month));
+
+  $sum = $result->fetchAssoc();  
+  $row[] = array('data' => number_format($sum['sum'], 2, ',', '.') . '€'); 
+  $row_orders[] = array('data' => $sum['count']);      
+  
+  $rows[] = $row;
+  $rows[] = $row_orders;
+  
+  // Lots und Items ermitteln
+  $row_lots = array();
+  $row_items = array();
+  $row_lots[] = array('data' => 'Lots');
+  $row_items[] = array('data' => 'Items');
+  // Germany  
+  $result = db_query("SELECT SUM(ol.field_orderlots_value) as lots,
+                      SUM(oi.field_orderitems_value) as items
+                      FROM field_data_field_bill_invoice_date d 
+                      LEFT JOIN field_data_field_bill_cancel c USING(entity_id)
+                      LEFT JOIN field_data_field_bill_check_mail mail USING(entity_id)
+                      LEFT JOIN field_data_field_bill_check_pdf pdf USING(entity_id)
+                      LEFT JOIN field_data_field_bill_country country USING(entity_id)
+                      LEFT JOIN field_data_field_bill_from fr USING(entity_id)
+                      LEFT JOIN node nb ON nb.nid = d.entity_id
+                      LEFT JOIN node no ON nb.title = no.title
+                      LEFT JOIN field_data_field_orderlots ol ON no.nid = ol.entity_id
+                      LEFT JOIN field_data_field_orderitems oi ON no.nid = oi.entity_id
+                      WHERE YEAR(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) = :y 
+                      AND MONTH(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) = :m
+                      AND (c.field_bill_cancel_value = 0 OR c.field_bill_cancel_value IS NULL)
+                      AND mail.field_bill_check_mail_value = 1
+                      AND pdf.field_bill_check_pdf_value = 1
+                      AND country.field_bill_country_value IN(:c)
+                      AND (fr.field_bill_from_value IN('BrickLink','BrickLinks') OR fr.field_bill_from_value IS NULL)", 
+                      array(':y' => $year, ':m' => $month, ':c' => 'Germany'));
+  
+  $sum = $result->fetchAssoc();
+  $row_lots[] = array('data' => $sum['lots']);
+  $row_items[] = array('data' => $sum['items']);
+  // EU
+  $result = db_query("SELECT SUM(ol.field_orderlots_value) as lots,
+                      SUM(oi.field_orderitems_value) as items
+                      FROM field_data_field_bill_invoice_date d 
+                      LEFT JOIN field_data_field_bill_cancel c USING(entity_id)
+                      LEFT JOIN field_data_field_bill_check_mail mail USING(entity_id)
+                      LEFT JOIN field_data_field_bill_check_pdf pdf USING(entity_id)
+                      LEFT JOIN field_data_field_bill_country country USING(entity_id)
+                      LEFT JOIN field_data_field_bill_from fr USING(entity_id)
+                      LEFT JOIN node nb ON nb.nid = d.entity_id
+                      LEFT JOIN node no ON nb.title = no.title
+                      LEFT JOIN field_data_field_orderlots ol ON no.nid = ol.entity_id
+                      LEFT JOIN field_data_field_orderitems oi ON no.nid = oi.entity_id
+                      WHERE YEAR(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) = :y 
+                      AND MONTH(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) = :m
+                      AND (c.field_bill_cancel_value = 0 OR c.field_bill_cancel_value IS NULL)
+                      AND mail.field_bill_check_mail_value = 1
+                      AND pdf.field_bill_check_pdf_value = 1
+                      AND country.field_bill_country_value IN('" . implode("','", bricks_bill_crawler_get_eu_array()) . "')
+                      AND (fr.field_bill_from_value IN('BrickLink','BrickLinks') OR fr.field_bill_from_value IS NULL)", 
+                      array(':y' => $year, ':m' => $month));
+
+  $sum = $result->fetchAssoc();  
+  $row_lots[] = array('data' => $sum['lots']);
+  $row_items[] = array('data' => $sum['items']);
+  // World
+  $result = db_query("SELECT SUM(ol.field_orderlots_value) as lots,
+                      SUM(oi.field_orderitems_value) as items
+                      FROM field_data_field_bill_invoice_date d 
+                      LEFT JOIN field_data_field_bill_cancel c USING(entity_id)
+                      LEFT JOIN field_data_field_bill_check_mail mail USING(entity_id)
+                      LEFT JOIN field_data_field_bill_check_pdf pdf USING(entity_id)
+                      LEFT JOIN field_data_field_bill_country country USING(entity_id)
+                      LEFT JOIN field_data_field_bill_from fr USING(entity_id)
+                      LEFT JOIN node nb ON nb.nid = d.entity_id
+                      LEFT JOIN node no ON nb.title = no.title
+                      LEFT JOIN field_data_field_orderlots ol ON no.nid = ol.entity_id
+                      LEFT JOIN field_data_field_orderitems oi ON no.nid = oi.entity_id
+                      WHERE YEAR(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) = :y 
+                      AND MONTH(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) = :m
+                      AND (c.field_bill_cancel_value = 0 OR c.field_bill_cancel_value IS NULL)
+                      AND mail.field_bill_check_mail_value = 1
+                      AND pdf.field_bill_check_pdf_value = 1
+                      AND country.field_bill_country_value NOT IN('" . implode("','", bricks_bill_crawler_get_eu_array(true)) . "')
+                      AND (fr.field_bill_from_value IN('BrickLink','BrickLinks') OR fr.field_bill_from_value IS NULL)", 
+                      array(':y' => $year, ':m' => $month));
+
+  $sum = $result->fetchAssoc();  
+  $row_lots[] = array('data' => $sum['lots']);
+  $row_items[] = array('data' => $sum['items']);  
+  // Gesamt
+  $result = db_query("SELECT SUM(ol.field_orderlots_value) as lots,
+                      SUM(oi.field_orderitems_value) as items
+                      FROM field_data_field_bill_invoice_date d 
+                      LEFT JOIN field_data_field_bill_cancel c USING(entity_id)
+                      LEFT JOIN field_data_field_bill_check_mail mail USING(entity_id)
+                      LEFT JOIN field_data_field_bill_check_pdf pdf USING(entity_id)
+                      LEFT JOIN field_data_field_bill_country country USING(entity_id)
+                      LEFT JOIN field_data_field_bill_from fr USING(entity_id)
+                      LEFT JOIN node nb ON nb.nid = d.entity_id
+                      LEFT JOIN node no ON nb.title = no.title
+                      LEFT JOIN field_data_field_orderlots ol ON no.nid = ol.entity_id
+                      LEFT JOIN field_data_field_orderitems oi ON no.nid = oi.entity_id
+                      WHERE YEAR(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) = :y 
+                      AND MONTH(STR_TO_DATE(d.field_bill_invoice_date_value,'%d.%m.%Y')) = :m
+                      AND (c.field_bill_cancel_value = 0 OR c.field_bill_cancel_value IS NULL)
+                      AND mail.field_bill_check_mail_value = 1
+                      AND pdf.field_bill_check_pdf_value = 1
+                      AND (fr.field_bill_from_value IN('BrickLink') OR fr.field_bill_from_value IS NULL)", 
+                      array(':y' => $year, ':m' => $month));
+
+  $sum = $result->fetchAssoc();  
+  $row_lots[] = array('data' => $sum['lots']);
+  $row_items[] = array('data' => $sum['items']);
+  
+  $rows[] = $row_lots;
+  $rows[] = $row_items;
+  
+  $output .= theme('table', array('header' => $header, 'rows' => $rows, 'attributes' => array()));
+  
+  return $output;
+}
+
+function bricks_bill_crawler_get_eu_array($ger = false) {
+  $eu_country_array = array(
+    'Austria',
+    'Belgium',
+    'Bulgaria',
+    'Croatia',
+    'Czech Republic',
+    'Cyprus',
+    'Denmark',
+    'Estonia',
+    'Finland',
+    'France',
+    'Greece',
+    'Hungary',
+    'Ireland',
+    'Italy',
+    'Latvia',
+    'Lithuania',
+    'Luxembourg',
+    'Malta',
+    'Netherlands',
+    'Poland',
+    'Portugal',
+    'Romania',
+    'Slovakia',
+    'Slovenia',
+    'Spain',
+    'Sweden',
+    'United Kingdom',
+  );
+  if ($ger === true) {
+    $eu_country_array[] = 'Germany';
+  }
+  
+  return $eu_country_array;
 }
