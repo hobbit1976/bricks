@@ -636,10 +636,14 @@ function bricks_bill_crawler_get_folder_to_save($node) {
     
   $path = 'rechnungen/';
   $path_eu_vat = '/eu-vat/';
-  $path_eu_non_vat = '/eu-non-vat/';
+  $path_eu_non_vat = '/eu-non-vat-eur/';
   $path_non_eu = '/non-eu/';
   $new_folder = false;
-  
+  // Zahlwaehrung für EU prüfen auf USD
+  if (isset($node->field_grand_total_in_payment[$node->language][0]["value"]) && !empty($node->field_grand_total_in_payment[$node->language][0]["value"])) {
+    $path_eu_non_vat = '/eu-non-vat-usd/';
+  }
+    
   $eu_country_array = array(
     'Austria',
     'Belgium',
